@@ -1,0 +1,12 @@
+syntax = "proto3";
+
+package bolt;
+
+message Track {
+  int64 ID = 1;
+  int64 PlaylistID = 2;
+  string FileID = 3;
+  string Title = 4;
+  int64 CreatedAt = 5;
+  int64 UpdatedAt = 6;
+}
