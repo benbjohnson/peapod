@@ -5,8 +5,7 @@ import "context"
 // NewContext returns a new Context that carries the authenticated user.
 func NewContext(ctx context.Context, user *User) context.Context {
 	return context.WithValue(ctx, valueKey, contextValue{
-		account: account,
-		user:    user,
+		user: user,
 	})
 }
 

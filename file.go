@@ -2,14 +2,15 @@ package peapod
 
 import (
 	"context"
+	"io"
 	"time"
 )
 
 // File represents an on-disk file.
 type File struct {
-	ID          string
-	ContentType string
-	CreatedAt   time.Time `json:"created_at"`
+	ID        string    `json:"id"`
+	Size      int64     `json:"size"`
+	CreatedAt time.Time `json:"created_at"`
 }
 
 // FileService represents a service for managing file objects.
