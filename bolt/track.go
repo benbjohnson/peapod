@@ -3,8 +3,8 @@ package bolt
 import (
 	"context"
 
-	"github.com/benbjohnson/peapod"
 	"github.com/gogo/protobuf/proto"
+	"github.com/middlemost/peapod"
 )
 
 // Ensure service implements interface.
