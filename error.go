@@ -2,6 +2,7 @@ package peapod
 
 // General errors.
 const (
+	ErrInternal     = Error("internal error")
 	ErrUnauthorized = Error("unauthorized")
 )
 

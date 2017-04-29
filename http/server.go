@@ -27,7 +27,13 @@ type Server struct {
 	Host        string // external hostname
 	Autocert    bool   // ACME autocert
 	Recoverable bool   // panic recovery
-	LogOutput   io.Writer
+
+	// Twilio specific options.
+	Twilio struct {
+		AccountSID string // twilio account number
+	}
+
+	LogOutput io.Writer
 }
 
 // NewServer returns a new instance of Server.
@@ -93,10 +99,7 @@ func (s *Server) router() http.Handler {
 	r.Route("/", func(r chi.Router) {
 		r.Use(middleware.DefaultCompress)
 		r.Get("/ping", s.handlePing)
-		// r.Mount("/files", s.fileHandler())
-		// r.Mount("/playlists", s.playlistHandler())
-		// r.Mount("/tracks", s.trackHandler())
-		// r.Mount("/users", s.userHandler())
+		r.Mount("/twilio", s.twilioHandler())
 	})
 
 	return r
@@ -105,4 +108,14 @@ func (s *Server) router() http.Handler {
 // handlePing verifies the database connection and returns a success.
 func (s *Server) handlePing(w http.ResponseWriter, r *http.Request) {
 	w.Write([]byte(`{"status:":"ok"}` + "\n"))
+}
+
+// twilioHandler
+func (s *Server) twilioHandler() *twilioHandler {
+	h := newTwilioHandler()
+	h.AccountSID = s.Twilio.AccountSID
+	h.PlaylistService = s.PlaylistService
+	h.TrackService = s.TrackService
+	h.UserService = s.UserService
+	return h
 }

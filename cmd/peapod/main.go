@@ -157,6 +157,7 @@ func (m *Main) Run() error {
 	httpServer.Addr = m.Config.HTTP.Addr
 	httpServer.Host = m.Config.HTTP.Host
 	httpServer.Autocert = m.Config.HTTP.Autocert
+	httpServer.Twilio.AccountSID = m.Config.Twilio.AccountSID
 	httpServer.LogOutput = m.Stderr
 
 	httpServer.FileService = fileService
@@ -198,6 +199,15 @@ type Config struct {
 		Host     string `toml:"host"`
 		Autocert bool   `toml:"autocert"`
 	} `toml:"http"`
+
+	Twilio struct {
+		AccountSID string `toml:"account-sid"`
+		AuthToken  string `toml:"auth-token"`
+	} `toml:"twilio"`
+
+	YoutubeDL struct {
+		Proxy string `toml:"proxy"`
+	} `toml:"youtube-dl"`
 }
 
 // NewConfig returns a configuration with default settings.

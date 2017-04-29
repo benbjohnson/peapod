@@ -1,11 +1,13 @@
 package youtube_dl
 
 import (
+	"context"
 	"net/url"
 )
 
-type AudioDecoder struct{}
+type TrackFileService struct{}
 
-func (dec *AudioDecoder) DecodeAudioURLToFile(u url.URL, filename string) error {
+func (s *TrackFileService) TrackFileFromURL(ctx context.Context, u url.URL) (*Track, io.ReadCloser, error) {
 	panic("TODO: Execute youtube-dl and extract audio.")
+	panic("TODO: Extract metadata")
 }
