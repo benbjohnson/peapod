@@ -5,6 +5,12 @@ import (
 	"time"
 )
 
+// User errors.
+const (
+	ErrUserRequired = Error("user required")
+	ErrUserNotFound = Error("user not found")
+)
+
 // User represents a user in the system.
 type User struct {
 	ID           int       `json:"id"`
@@ -13,16 +19,10 @@ type User struct {
 	UpdatedAt    time.Time `json:"updated_at"`
 }
 
-// UserUpdate represents an update to a user.
-type UserUpdate struct {
-	MobileNumber *string `json:"mobile_number"`
-}
-
 // UserService represents a service for managing users.
 type UserService interface {
 	FindUserByID(ctx context.Context, id int) (*User, error)
 	FindUserByMobileNumber(ctx context.Context, mobileNumber string) (*User, error)
 	FindOrCreateUserByMobileNumber(ctx context.Context, mobileNumber string) (*User, error)
 	CreateUser(ctx context.Context, u *User) error
-	UpdateUser(ctx context.Context, id int, upd UserUpdate) error
 }

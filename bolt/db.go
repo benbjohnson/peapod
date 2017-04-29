@@ -1,11 +1,13 @@
 package bolt
 
 import (
+	"context"
 	"os"
 	"path/filepath"
 	"time"
 
 	"github.com/boltdb/bolt"
+	"github.com/middlemost/peapod"
 )
 
 // DB represents a handle to a Bolt database.
@@ -49,7 +51,7 @@ func (db *DB) Close() error {
 }
 
 // Begin starts a new transaction.
-func (db *DB) Begin(writable bool) (*Tx, error) {
+func (db *DB) Begin(ctx context.Context, writable bool) (*Tx, error) {
 	tx, err := db.db.Begin(writable)
 	if err != nil {
 		return nil, err
@@ -57,8 +59,24 @@ func (db *DB) Begin(writable bool) (*Tx, error) {
 	return &Tx{Tx: tx, Now: db.Now()}, nil
 }
 
+// BeginAuth starts a new transaction and verifies that a user is authenticated.
+func (db *DB) BeginAuth(ctx context.Context, writable bool) (*Tx, error) {
+	u := peapod.FromContext(ctx)
+	if u == nil {
+		return nil, peapod.ErrUnauthorized
+	}
+	return db.Begin(ctx, writable)
+}
+
 // Tx is a wrapper for bolt.Tx.
 type Tx struct {
 	*bolt.Tx
 	Now time.Time
+}
+
+func errorString(err error) string {
+	if err != nil {
+		return err.Error()
+	}
+	return ""
 }

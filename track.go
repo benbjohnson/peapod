@@ -2,6 +2,8 @@ package peapod
 
 import (
 	"context"
+	"io"
+	"net/url"
 	"time"
 )
 
@@ -26,4 +28,9 @@ type Track struct {
 // TrackService represents a service for managing audio tracks.
 type TrackService interface {
 	CreateTrack(ctx context.Context, track *Track) error
+}
+
+// URLTrackGenerator returns a track and file contents from a URL.
+type URLTrackGenerator interface {
+	GenerateTrackFromURL(ctx context.Context, url url.URL) (*Track, io.ReadCloser, error)
 }

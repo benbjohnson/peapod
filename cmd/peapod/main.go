@@ -148,9 +148,20 @@ func (m *Main) Run() error {
 	fmt.Fprintf(m.Stdout, "database initialized: path=%s\n", m.Config.Database.Path)
 
 	// Instantiate bolt services.
+	jobService := bolt.NewJobService(db)
 	playlistService := bolt.NewPlaylistService(db)
 	trackService := bolt.NewTrackService(db)
 	userService := bolt.NewUserService(db)
+
+	// Reset job queue.
+	if err := jobService.ResetJobQueue(context.Background()); err != nil {
+		return fmt.Errorf("error: reset job queue: %s", err)
+	}
+
+	// Start job scheduler.
+	if err := jobService.Open(); err != nil {
+		return fmt.Errorf("error: open job service: %s", err)
+	}
 
 	// Initialize HTTP server.
 	httpServer := http.NewServer()
@@ -174,6 +185,7 @@ func (m *Main) Run() error {
 	// Assign close function.
 	m.closeFn = func() error {
 		httpServer.Close()
+		jobService.Close()
 		db.Close()
 		return nil
 	}

@@ -66,10 +66,13 @@ func (h *twilioHandler) handlePostSMS(w http.ResponseWriter, r *http.Request) {
 	from := r.PostFormValue("From")
 	body := strings.TrimSpace(r.PostFormValue("Body"))
 
-	// Parse message as URL.
+	// Parse message as URL & ensure it doesn't point locally.
 	u, err := url.Parse(body)
 	if err != nil {
 		Error(ctx, w, r, ErrInvalidSMSRequestBody)
+		return
+	} else if peapod.IsLocal(u.Hostname()) {
+		Error(ctx, w, r, peapod.ErrInvalidURL)
 		return
 	}
 
@@ -80,11 +83,24 @@ func (h *twilioHandler) handlePostSMS(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Fetch user playlists.
+	playlists, err := h.UserService.UserPlaylists(ctx, user.ID)
+	if err != nil {
+		Error(ctx, w, r, err)
+		return
+	} else if len(playlists) == 0 {
+		Error(ctx, w, r, peapod.ErrPlaylistNotFound)
+	}
+
+	// TODO: Ask user which playlist if there are multiple. Currently only one can exist.
+	playlist := playlists[0]
+
 	// Add URL to job processing queue.
 	job := peapod.Job{
-		UserID: user.ID,
-		Type:   peapod.JobTypeCreateTrackFromURL,
-		URL:    u.String(),
+		UserID:     user.ID,
+		Type:       peapod.JobTypeCreateTrackFromURL,
+		PlaylistID: playlist.ID,
+		URL:        u.String(),
 	}
 	if err := h.JobService.CreateJob(ctx, &job); err != nil {
 		Error(ctx, w, r, err)

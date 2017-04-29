@@ -22,14 +22,7 @@ func NewTrackService(db *DB) *TrackService {
 
 // CreateTrack creates a new track on a playlist.
 func (s *TrackService) CreateTrack(ctx context.Context, track *peapod.Track) error {
-	// Ensure user is authenticated.
-	u := peapod.FromContext(ctx)
-	if u == nil {
-		return peapod.ErrUnauthorized
-	}
-
-	// Start transaction.
-	tx, err := s.db.Begin(true)
+	tx, err := s.db.BeginAuth(ctx, true)
 	if err != nil {
 		return err
 	}
