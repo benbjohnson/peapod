@@ -44,6 +44,36 @@ func (s *PlaylistService) FindPlaylistByID(ctx context.Context, id int) (*peapod
 	return playlist, nil
 }
 
+// FindPlaylistByToken returns a playlist and its tracks by token.
+func (s *PlaylistService) FindPlaylistByToken(ctx context.Context, token string) (*peapod.Playlist, error) {
+	tx, err := s.db.BeginAuth(ctx, false)
+	if err != nil {
+		return nil, err
+	}
+	defer tx.Rollback()
+
+	// Retrieve id from the token.
+	id := findPlaylistIDByToken(ctx, tx, token)
+	if id == 0 {
+		return nil, peapod.ErrPlaylistNotFound
+	}
+
+	// Retrieve playlist.
+	playlist, err := findPlaylistByID(ctx, tx, id)
+	if err != nil {
+		return nil, err
+	}
+
+	// Attach tracks.
+	tracks, err := playlistTracks(ctx, tx, playlist.ID)
+	if err != nil {
+		return nil, err
+	}
+	playlist.Tracks = tracks
+
+	return playlist, nil
+}
+
 func findPlaylistByID(ctx context.Context, tx *Tx, id int) (*peapod.Playlist, error) {
 	bkt := tx.Bucket([]byte("Playlists"))
 	if bkt == nil {
@@ -65,6 +95,18 @@ func playlistExists(ctx context.Context, tx *Tx, id int) bool {
 		return false
 	}
 	return bkt.Get(itob(id)) != nil
+}
+
+func findPlaylistIDByToken(ctx context.Context, tx *Tx, token string) int {
+	bkt := tx.Bucket([]byte("Playlists.Token"))
+	if bkt == nil {
+		return 0
+	}
+	v := bkt.Get([]byte(token))
+	if v == nil {
+		return 0
+	}
+	return btoi(v)
 }
 
 func marshalPlaylist(v *peapod.Playlist) ([]byte, error) {

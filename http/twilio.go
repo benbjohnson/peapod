@@ -97,7 +97,7 @@ func (h *twilioHandler) handlePostSMS(w http.ResponseWriter, r *http.Request) {
 
 	// Add URL to job processing queue.
 	job := peapod.Job{
-		UserID:     user.ID,
+		OwnerID:    user.ID,
 		Type:       peapod.JobTypeCreateTrackFromURL,
 		PlaylistID: playlist.ID,
 		URL:        u.String(),

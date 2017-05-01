@@ -17,12 +17,15 @@ const (
 
 // Track represents an audio track.
 type Track struct {
-	ID         int       `json:"id"`
-	PlaylistID int       `json:"playlist_id"`
-	FileID     string    `json:"file_id"`
-	Title      string    `json:"title"`
-	CreatedAt  time.Time `json:"created_at"`
-	UpdatedAt  time.Time `json:"updated_at"`
+	ID          int           `json:"id"`
+	PlaylistID  int           `json:"playlist_id"`
+	FileID      string        `json:"file_id"`
+	Title       string        `json:"title"`
+	Duration    time.Duration `json:"duration"`
+	ContentType string        `json:"content_type"`
+	Size        int           `json:"size"`
+	CreatedAt   time.Time     `json:"created_at"`
+	UpdatedAt   time.Time     `json:"updated_at"`
 }
 
 // TrackService represents a service for managing audio tracks.

@@ -133,12 +133,15 @@ func playlistTracks(ctx context.Context, tx *Tx, playlistID int) ([]*peapod.Trac
 
 func marshalTrack(v *peapod.Track) ([]byte, error) {
 	return proto.Marshal(&Track{
-		ID:         int64(v.ID),
-		PlaylistID: int64(v.PlaylistID),
-		FileID:     v.FileID,
-		Title:      v.Title,
-		CreatedAt:  encodeTime(v.CreatedAt),
-		UpdatedAt:  encodeTime(v.UpdatedAt),
+		ID:          int64(v.ID),
+		PlaylistID:  int64(v.PlaylistID),
+		FileID:      v.FileID,
+		ContentType: v.ContentType,
+		Title:       v.Title,
+		Duration:    int64(v.Duration),
+		Size:        int64(v.Size),
+		CreatedAt:   encodeTime(v.CreatedAt),
+		UpdatedAt:   encodeTime(v.UpdatedAt),
 	})
 }
 
@@ -148,12 +151,15 @@ func unmarshalTrack(data []byte, v *peapod.Track) error {
 		return err
 	}
 	*v = peapod.Track{
-		ID:         int(pb.ID),
-		PlaylistID: int(pb.PlaylistID),
-		FileID:     pb.FileID,
-		Title:      pb.Title,
-		CreatedAt:  decodeTime(pb.CreatedAt),
-		UpdatedAt:  decodeTime(pb.UpdatedAt),
+		ID:          int(pb.ID),
+		PlaylistID:  int(pb.PlaylistID),
+		FileID:      pb.FileID,
+		ContentType: pb.ContentType,
+		Title:       pb.Title,
+		Duration:    time.Duration(v.Duration),
+		Size:        int(v.Size),
+		CreatedAt:   decodeTime(pb.CreatedAt),
+		UpdatedAt:   decodeTime(pb.UpdatedAt),
 	}
 	return nil
 }

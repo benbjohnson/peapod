@@ -25,9 +25,12 @@ message Track {
   int64 ID = 1;
   int64 PlaylistID = 2;
   string FileID = 3;
-  string Title = 4;
-  int64 CreatedAt = 5;
-  int64 UpdatedAt = 6;
+  string ContentType = 4;
+  string Title = 5;
+  int64 Duration = 6;
+  int64 Size = 7;
+  int64 CreatedAt = 8;
+  int64 UpdatedAt = 9;
 }
 
 message User {

@@ -5,6 +5,7 @@ import (
 	"io/ioutil"
 	"net"
 	"net/http"
+	"net/url"
 
 	"github.com/middlemost/peapod"
 	"github.com/pressly/chi"
@@ -74,15 +75,15 @@ func (s *Server) Close() error {
 
 // URL returns a base URL string with the scheme and host.
 // This is available after the server has been opened.
-func (s *Server) URL() string {
+func (s *Server) URL() url.URL {
 	if s.ln == nil {
-		return ""
+		return url.URL{}
 	}
 
 	if s.Autocert {
-		return "https://" + s.Host
+		return url.URL{Scheme: "https", Host: s.Host}
 	}
-	return "http://" + s.ln.Addr().String()
+	return url.URL{Scheme: "http", Host: s.ln.Addr().String()}
 }
 
 func (s *Server) router() http.Handler {
@@ -99,6 +100,7 @@ func (s *Server) router() http.Handler {
 	r.Route("/", func(r chi.Router) {
 		r.Use(middleware.DefaultCompress)
 		r.Get("/ping", s.handlePing)
+		r.Mount("/playlists", s.playlistHandler())
 		r.Mount("/twilio", s.twilioHandler())
 	})
 
@@ -110,7 +112,13 @@ func (s *Server) handlePing(w http.ResponseWriter, r *http.Request) {
 	w.Write([]byte(`{"status:":"ok"}` + "\n"))
 }
 
-// twilioHandler
+func (s *Server) playlistHandler() *playlistHandler {
+	h := newPlaylistHandler()
+	h.baseURL = s.URL()
+	h.playlistService = s.PlaylistService
+	return h
+}
+
 func (s *Server) twilioHandler() *twilioHandler {
 	h := newTwilioHandler()
 	h.AccountSID = s.Twilio.AccountSID
