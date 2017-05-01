@@ -17,6 +17,8 @@ type Playlist struct {
 	Name      string    `json:"name"`
 	CreatedAt time.Time `json:"created_at"`
 	UpdatedAt time.Time `json:"updated_at"`
+
+	Tracks []*Track `json:"tracks,omitempty"`
 }
 
 // PlaylistService represents a service for managing playlists.

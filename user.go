@@ -24,5 +24,4 @@ type UserService interface {
 	FindUserByID(ctx context.Context, id int) (*User, error)
 	FindUserByMobileNumber(ctx context.Context, mobileNumber string) (*User, error)
 	FindOrCreateUserByMobileNumber(ctx context.Context, mobileNumber string) (*User, error)
-	CreateUser(ctx context.Context, u *User) error
 }

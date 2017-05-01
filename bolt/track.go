@@ -1,6 +1,7 @@
 package bolt
 
 import (
+	"bytes"
 	"context"
 
 	"github.com/gogo/protobuf/proto"
@@ -44,6 +45,29 @@ func (s *TrackService) CreateTrack(ctx context.Context, track *peapod.Track) err
 	return nil
 }
 
+func findTrackByID(ctx context.Context, tx *Tx, id int) (*peapod.Track, error) {
+	bkt := tx.Bucket([]byte("Tracks"))
+	if bkt == nil {
+		return nil, nil
+	}
+
+	var track peapod.Track
+	if buf := bkt.Get(itob(id)); buf == nil {
+		return nil, nil
+	} else if err := unmarshalTrack(buf, &track); err != nil {
+		return nil, err
+	}
+	return &track, nil
+}
+
+func trackExists(ctx context.Context, tx *Tx, id int) bool {
+	bkt := tx.Bucket([]byte("Tracks"))
+	if bkt == nil {
+		return false
+	}
+	return bkt.Get(itob(id)) != nil
+}
+
 func createTrack(ctx context.Context, tx *Tx, track *peapod.Track) error {
 	bkt, err := tx.CreateBucketIfNotExists([]byte("Tracks"))
 	if err != nil {
@@ -77,7 +101,7 @@ func saveTrack(ctx context.Context, tx *Tx, track *peapod.Track) error {
 	}
 
 	// Marshal and update record.
-	if buf, err := MarshalTrack(track); err != nil {
+	if buf, err := marshalTrack(track); err != nil {
 		return err
 	} else if bkt, err := tx.CreateBucketIfNotExists([]byte("Tracks")); err != nil {
 		return err
@@ -85,10 +109,29 @@ func saveTrack(ctx context.Context, tx *Tx, track *peapod.Track) error {
 		return err
 	}
 	return nil
-
 }
 
-func MarshalTrack(v *peapod.Track) ([]byte, error) {
+func playlistTracks(ctx context.Context, tx *Tx, playlistID int) ([]*peapod.Track, error) {
+	bkt := tx.Bucket([]byte("Playlists.Tracks"))
+	if bkt == nil {
+		return nil, nil
+	}
+
+	// Iterate over index.
+	a := make([]*peapod.Track, 0, 10)
+	cur := bkt.Cursor()
+	prefix := itob(playlistID)
+	for k, _ := cur.Seek(prefix); bytes.HasPrefix(k, prefix); k, _ = cur.Next() {
+		track, err := findTrackByID(ctx, tx, btoi(k[8:]))
+		if err != nil {
+			return nil, err
+		}
+		a = append(a, track)
+	}
+	return a, nil
+}
+
+func marshalTrack(v *peapod.Track) ([]byte, error) {
 	return proto.Marshal(&Track{
 		ID:         int64(v.ID),
 		PlaylistID: int64(v.PlaylistID),
@@ -97,4 +140,20 @@ func MarshalTrack(v *peapod.Track) ([]byte, error) {
 		CreatedAt:  encodeTime(v.CreatedAt),
 		UpdatedAt:  encodeTime(v.UpdatedAt),
 	})
+}
+
+func unmarshalTrack(data []byte, v *peapod.Track) error {
+	var pb Track
+	if err := proto.Unmarshal(data, &pb); err != nil {
+		return err
+	}
+	*v = peapod.Track{
+		ID:         int(pb.ID),
+		PlaylistID: int(pb.PlaylistID),
+		FileID:     pb.FileID,
+		Title:      pb.Title,
+		CreatedAt:  decodeTime(pb.CreatedAt),
+		UpdatedAt:  decodeTime(pb.UpdatedAt),
+	}
+	return nil
 }

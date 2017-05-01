@@ -29,11 +29,8 @@ func (s *UserService) FindUserByMobileNumber(ctx context.Context, mobileNumber s
 }
 
 func (s *UserService) FindOrCreateUserByMobileNumber(ctx context.Context, mobileNumber string) (*peapod.User, error) {
-	panic("TODO")
-}
-
-func (s *UserService) CreateUser(ctx context.Context, u *peapod.User) error {
-	panic("TODO")
+	panic("TODO: Create user")
+	panic("TODO: Create default playlist")
 }
 
 func findUserByID(ctx context.Context, tx *Tx, id int) (*peapod.User, error) {
