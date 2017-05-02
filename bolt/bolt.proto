@@ -26,9 +26,10 @@ message Playlist {
 message Track {
   int64 ID = 1;
   int64 PlaylistID = 2;
-  string FileID = 3;
+  string Filename = 3;
   string ContentType = 4;
   string Title = 5;
+  string Description = 10;
   int64 Duration = 6;
   int64 FileSize = 7;
   int64 CreatedAt = 8;

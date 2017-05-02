@@ -11,7 +11,12 @@ import (
 var _ peapod.TrackService = &TrackService{}
 
 type TrackService struct {
-	CreateTrackFn func(ctx context.Context, track *peapod.Track) error
+	FindTrackByIDFn func(ctx context.Context, id int) (*peapod.Track, error)
+	CreateTrackFn   func(ctx context.Context, track *peapod.Track) error
+}
+
+func (s *TrackService) FindTrackByID(ctx context.Context, id int) (*peapod.Track, error) {
+	return s.FindTrackByIDFn(ctx, id)
 }
 
 func (s *TrackService) CreateTrack(ctx context.Context, track *peapod.Track) error {

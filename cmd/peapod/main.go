@@ -154,6 +154,7 @@ func (m *Main) Run() error {
 	// Initialize youtube-dl.
 	urlTrackGenerator := youtube_dl.NewURLTrackGenerator()
 	urlTrackGenerator.Proxy = m.Config.YoutubeDL.Proxy
+	urlTrackGenerator.LogOutput = m.Stdout
 
 	// Open database.
 	db := bolt.NewDB()

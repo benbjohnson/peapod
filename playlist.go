@@ -14,7 +14,7 @@ const (
 	ErrPlaylistNameRequired  = Error("playlist name required")
 )
 
-const DefaultPlaylistName = "default"
+const DefaultPlaylistName = "My Peapod"
 
 // Playlist represents a time-ordered list of tracks.
 type Playlist struct {

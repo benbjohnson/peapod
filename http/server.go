@@ -106,8 +106,10 @@ func (s *Server) router() http.Handler {
 	r.Route("/", func(r chi.Router) {
 		r.Use(middleware.DefaultCompress)
 		r.Get("/ping", s.handlePing)
+		r.Mount("/assets", newAssetHandler())
 		r.Mount("/p", s.playlistHandler()) // alias
 		r.Mount("/playlists", s.playlistHandler())
+		r.Mount("/files", s.fileHandler())
 		r.Mount("/twilio", s.twilioHandler())
 	})
 
@@ -123,6 +125,12 @@ func (s *Server) playlistHandler() *playlistHandler {
 	h := newPlaylistHandler()
 	h.baseURL = s.URL()
 	h.playlistService = s.PlaylistService
+	return h
+}
+
+func (s *Server) fileHandler() *fileHandler {
+	h := newFileHandler()
+	h.fileService = s.FileService
 	return h
 }
 

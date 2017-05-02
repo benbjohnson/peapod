@@ -20,16 +20,14 @@ func TestFileService(t *testing.T) {
 
 	// Create file.
 	var f peapod.File
-	if err := s.CreateFile(context.Background(), &f, strings.NewReader("ABC")); err != nil {
+	if err := s.CreateFile(context.Background(), &peapod.File{Name: "0001"}, strings.NewReader("ABC")); err != nil {
 		t.Fatal(err)
-	} else if !reflect.DeepEqual(&f, &peapod.File{ID: "0001"}) {
-		t.Fatalf("unexpected file: %#v", &f)
 	}
 
 	// Fetch file & verify.
-	if other, rc, err := s.FindFileByID(context.Background(), "0001"); err != nil {
+	if other, rc, err := s.FindFileByName(context.Background(), "0001"); err != nil {
 		t.Fatal(err)
-	} else if !reflect.DeepEqual(other, &peapod.File{ID: "0001"}) {
+	} else if !reflect.DeepEqual(other, &peapod.File{Name: "0001", Size: 3}) {
 		t.Fatalf("unexpected file: %#v", f)
 	} else if buf, err := ioutil.ReadAll(rc); err != nil {
 		t.Fatal(err)
@@ -54,7 +52,6 @@ func NewFileService() *FileService {
 
 	s := &FileService{FileService: local.NewFileService()}
 	s.Path = path
-	s.GenerateToken = SequentialTokenGenerator()
 	return s
 }
 

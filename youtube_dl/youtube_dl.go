@@ -13,12 +13,6 @@ import (
 	"github.com/middlemost/peapod"
 )
 
-// Only support a single format for now.
-const (
-	Format      = "m4a"
-	ContentType = "audio/mp4"
-)
-
 // URLTrackGenerator generates audio tracks from a URL.
 type URLTrackGenerator struct {
 	Proxy string
@@ -50,7 +44,15 @@ func (g *URLTrackGenerator) GenerateTrackFromURL(ctx context.Context, u url.URL)
 	path := f.Name()
 
 	// Build argument list.
-	args := []string{"-v", "-f", Format, "-o", f.Name(), "--write-info-json"}
+	args := []string{
+		"-v",
+		"-f", "bestaudio",
+		"--extract-audio",
+		"--audio-format", "mp3",
+		"--audio-quality", "128K",
+		"-o", path + ".%(ext)s",
+		"--write-info-json",
+	}
 	if g.Proxy != "" {
 		args = append(args, "--proxy", g.Proxy)
 	}
@@ -74,14 +76,15 @@ func (g *URLTrackGenerator) GenerateTrackFromURL(ctx context.Context, u url.URL)
 
 	// Build track.
 	track := &peapod.Track{
-		Title:       info.FullTitle,
+		Title:       info.Title,
+		Description: info.Description,
 		Duration:    time.Duration(info.Duration) * time.Second,
-		ContentType: ContentType,
+		ContentType: "audio/mp3",
 		Size:        info.Size,
 	}
 
 	// Open file handle to return for reading.
-	file, err := os.Open(path)
+	file, err := os.Open(path + ".mp3")
 	if err != nil {
 		return nil, nil, err
 	}
@@ -91,9 +94,10 @@ func (g *URLTrackGenerator) GenerateTrackFromURL(ctx context.Context, u url.URL)
 
 // infoFile represents a partial structure of the youtube-dl info JSON file.
 type infoFile struct {
-	FullTitle string `json:"fulltitle"`
-	Duration  int    `json:"duration"`
-	Size      int    `json:"filesize"`
+	Title       string `json:"title"`
+	Description string `json:"description"`
+	Duration    int    `json:"duration"`
+	Size        int    `json:"filesize"`
 }
 
 // oneTimeReader allows the reader to read once and then it deletes on close.

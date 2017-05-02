@@ -2,8 +2,6 @@ package local
 
 import (
 	"context"
-	"crypto/rand"
-	"fmt"
 	"io"
 	"os"
 	"path/filepath"
@@ -13,29 +11,42 @@ import (
 
 // FileService represents a service for serving files from the local filesystem.
 type FileService struct {
-	Path string
-
+	Path          string
 	GenerateToken func() string
 }
 
 // NewFileService returns a new instance of FileService.
 func NewFileService() *FileService {
 	return &FileService{
-		GenerateToken: MustGenerateToken,
+		GenerateToken: peapod.GenerateToken,
 	}
 }
 
-// FindFileByID returns a file and a reader to its contents.
+// GenerateName returns a randomly generated name with the given extension.
+func (s *FileService) GenerateName(ext string) string {
+	return s.GenerateToken() + ext
+}
+
+// FindFileByName returns a file and a reader to its contents.
 // The read must be closed by the caller.
-func (s *FileService) FindFileByID(ctx context.Context, id string) (*peapod.File, io.ReadCloser, error) {
-	if id == "" {
-		return nil, nil, peapod.ErrFileIDRequired
-	} else if !peapod.IsValidFileID(id) {
-		return nil, nil, peapod.ErrInvalidFileID
+func (s *FileService) FindFileByName(ctx context.Context, name string) (*peapod.File, io.ReadCloser, error) {
+	if name == "" {
+		return nil, nil, peapod.ErrFilenameRequired
+	} else if !peapod.IsValidFilename(name) {
+		return nil, nil, peapod.ErrInvalidFilename
+	}
+
+	// Stat file.
+	path := filepath.Join(s.Path, name)
+	fi, err := os.Stat(path)
+	if os.IsNotExist(err) {
+		return nil, nil, nil
+	} else if err != nil {
+		return nil, nil, err
 	}
 
 	// Open local file.
-	file, err := os.Open(filepath.Join(s.Path, id))
+	file, err := os.Open(path)
 	if os.IsNotExist(err) {
 		return nil, nil, nil
 	} else if err != nil {
@@ -43,23 +54,21 @@ func (s *FileService) FindFileByID(ctx context.Context, id string) (*peapod.File
 	}
 
 	// Generate file object.
-	f := &peapod.File{ID: id}
+	f := &peapod.File{Name: name, Size: fi.Size()}
 
 	return f, file, nil
 }
 
-// CreateFile creates a new file with the contents of r. Returns the ID to f.ID.
+// CreateFile creates a new file with the contents of r.
 func (s *FileService) CreateFile(ctx context.Context, f *peapod.File, r io.Reader) error {
-	// Generate random ID.
-	id := s.GenerateToken()
-
 	// Ensure parent path exists.
 	if err := os.MkdirAll(s.Path, 0777); err != nil {
 		return err
 	}
 
 	// Create file inside directory.
-	file, err := os.Create(filepath.Join(s.Path, id))
+	path := filepath.Join(s.Path, f.Name)
+	file, err := os.Create(path)
 	if err != nil {
 		return err
 	}
@@ -76,17 +85,12 @@ func (s *FileService) CreateFile(ctx context.Context, f *peapod.File, r io.Reade
 		return err
 	}
 
-	// Assign id to file.
-	f.ID = id
+	// Read size.
+	fi, err := os.Stat(path)
+	if err != nil {
+		return err
+	}
+	f.Size = fi.Size()
 
 	return nil
-}
-
-// MustGenerateToken returns a random string.
-func MustGenerateToken() string {
-	buf := make([]byte, 20)
-	if _, err := rand.Read(buf); err != nil {
-		panic(err)
-	}
-	return fmt.Sprintf("%x", buf)
 }

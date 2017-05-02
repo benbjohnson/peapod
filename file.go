@@ -8,24 +8,26 @@ import (
 
 // File errors
 const (
-	ErrFileIDRequired = Error("file id required")
-	ErrInvalidFileID  = Error("invalid file id")
+	ErrFilenameRequired = Error("filename required")
+	ErrInvalidFilename  = Error("invalid filename")
 )
 
 // File represents an on-disk file.
 type File struct {
-	ID string `json:"id"`
+	Name string `json:"name"`
+	Size int64  `json:"size"`
 }
 
 // FileService represents a service for managing file objects.
 type FileService interface {
-	FindFileByID(ctx context.Context, id string) (*File, io.ReadCloser, error)
+	GenerateName(ext string) string
+	FindFileByName(ctx context.Context, name string) (*File, io.ReadCloser, error)
 	CreateFile(ctx context.Context, f *File, r io.Reader) error
 }
 
-// IsValidFileID returns true if the id is in a valid format.
-func IsValidFileID(id string) bool {
-	return fileIDRegex.MatchString(id)
+// IsValidFilename returns true if the name is in a valid format.
+func IsValidFilename(name string) bool {
+	return fileIDRegex.MatchString(name)
 }
 
-var fileIDRegex = regexp.MustCompile(`^[a-zA-Z0-9]+$`)
+var fileIDRegex = regexp.MustCompile(`^[a-z0-9]+(\.[a-z0-9]+)?$`)

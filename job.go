@@ -228,14 +228,14 @@ func (e *JobExecutor) createTrackFromURL(ctx context.Context, job *Job) error {
 	defer rc.Close()
 
 	// Create a file from the reader.
-	var file File
-	if err := e.FileService.CreateFile(ctx, &file, rc); err != nil {
+	file := &File{Name: e.FileService.GenerateName(".mp3")}
+	if err := e.FileService.CreateFile(ctx, file, rc); err != nil {
 		return err
 	}
 
 	// Attach playlist & file to track.
 	track.PlaylistID = job.PlaylistID
-	track.FileID = file.ID
+	track.Filename = file.Name
 
 	// Create new track.
 	if err := e.TrackService.CreateTrack(ctx, track); err != nil {
@@ -245,7 +245,7 @@ func (e *JobExecutor) createTrackFromURL(ctx context.Context, job *Job) error {
 	// Notify user of success.
 	msg := &SMS{
 		To:   user.MobileNumber,
-		Body: `Finished processing. Your track has been added to your playlist.`,
+		Body: fmt.Sprintf(`%q has been added to your playlist.`, track.Title),
 	}
 	if err := e.SMSService.SendSMS(ctx, msg); err != nil {
 		return err

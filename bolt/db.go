@@ -2,8 +2,6 @@ package bolt
 
 import (
 	"context"
-	"crypto/rand"
-	"fmt"
 	"os"
 	"path/filepath"
 	"time"
@@ -25,7 +23,7 @@ type DB struct {
 func NewDB() *DB {
 	return &DB{
 		Now:           time.Now,
-		GenerateToken: MustGenerateToken,
+		GenerateToken: peapod.GenerateToken,
 	}
 }
 
@@ -84,13 +82,4 @@ func errorString(err error) string {
 		return err.Error()
 	}
 	return ""
-}
-
-// MustGenerateToken returns a random string.
-func MustGenerateToken() string {
-	buf := make([]byte, 20)
-	if _, err := rand.Read(buf); err != nil {
-		panic(err)
-	}
-	return fmt.Sprintf("%x", buf)
 }

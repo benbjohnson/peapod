@@ -22,6 +22,17 @@ func NewTrackService(db *DB) *TrackService {
 	return &TrackService{db: db}
 }
 
+// FindTrackByID returns a track by id.
+func (s *TrackService) FindTrackByID(ctx context.Context, id int) (*peapod.Track, error) {
+	tx, err := s.db.Begin(ctx, false)
+	if err != nil {
+		return nil, err
+	}
+	defer tx.Rollback()
+
+	return findTrackByID(ctx, tx, id)
+}
+
 // CreateTrack creates a new track on a playlist.
 func (s *TrackService) CreateTrack(ctx context.Context, track *peapod.Track) error {
 	tx, err := s.db.BeginAuth(ctx, true)
@@ -97,8 +108,8 @@ func saveTrack(ctx context.Context, tx *Tx, track *peapod.Track) error {
 		return peapod.ErrTrackPlaylistRequired
 	} else if !playlistExists(ctx, tx, track.PlaylistID) {
 		return peapod.ErrPlaylistNotFound
-	} else if track.FileID == "" {
-		return peapod.ErrTrackFileRequired
+	} else if track.Filename == "" {
+		return peapod.ErrTrackFilenameRequired
 	}
 
 	// Update timestamps.
@@ -139,9 +150,10 @@ func marshalTrack(v *peapod.Track) ([]byte, error) {
 	return proto.Marshal(&Track{
 		ID:          int64(v.ID),
 		PlaylistID:  int64(v.PlaylistID),
-		FileID:      v.FileID,
+		Filename:    v.Filename,
 		ContentType: v.ContentType,
 		Title:       v.Title,
+		Description: v.Description,
 		Duration:    int64(v.Duration),
 		FileSize:    int64(v.Size),
 		CreatedAt:   encodeTime(v.CreatedAt),
@@ -157,9 +169,10 @@ func unmarshalTrack(data []byte, v *peapod.Track) error {
 	*v = peapod.Track{
 		ID:          int(pb.ID),
 		PlaylistID:  int(pb.PlaylistID),
-		FileID:      pb.FileID,
+		Filename:    pb.Filename,
 		ContentType: pb.ContentType,
 		Title:       pb.Title,
+		Description: pb.Description,
 		Duration:    time.Duration(pb.Duration),
 		Size:        int(pb.FileSize),
 		CreatedAt:   decodeTime(pb.CreatedAt),

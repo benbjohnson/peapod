@@ -13,15 +13,12 @@ var _ peapod.UserService = &UserService{}
 // UserService represents a service to manage users.
 type UserService struct {
 	db *DB
-
-	GenerateToken func() string
 }
 
 // NewUserService returns a new instance of UserService.
 func NewUserService(db *DB) *UserService {
 	return &UserService{
-		db:            db,
-		GenerateToken: MustGenerateToken,
+		db: db,
 	}
 }
 

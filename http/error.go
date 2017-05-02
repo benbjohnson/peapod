@@ -12,6 +12,7 @@ import (
 
 const (
 	ErrNotAcceptable = peapod.Error("not acceptable")
+	ErrAssetNotFound = peapod.Error("asset not found")
 )
 
 // errorMap is a whitelist that maps errors to status codes.

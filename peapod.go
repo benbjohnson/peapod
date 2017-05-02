@@ -1,6 +1,10 @@
 package peapod
 
-import "net"
+import (
+	"crypto/rand"
+	"fmt"
+	"net"
+)
 
 // General errors.
 const (
@@ -21,4 +25,13 @@ func IsLocal(hostname string) bool {
 	}
 
 	return false
+}
+
+// GenerateToken returns a random string.
+func GenerateToken() string {
+	buf := make([]byte, 20)
+	if _, err := rand.Read(buf); err != nil {
+		panic(err)
+	}
+	return fmt.Sprintf("%x", buf)
 }

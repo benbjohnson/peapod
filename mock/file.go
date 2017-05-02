@@ -10,12 +10,17 @@ import (
 var _ peapod.FileService = &FileService{}
 
 type FileService struct {
-	FindFileByIDFn func(ctx context.Context, id string) (*peapod.File, io.ReadCloser, error)
-	CreateFileFn   func(ctx context.Context, f *peapod.File, r io.Reader) error
+	GenerateNameFn   func(ext string) string
+	FindFileByNameFn func(ctx context.Context, name string) (*peapod.File, io.ReadCloser, error)
+	CreateFileFn     func(ctx context.Context, f *peapod.File, r io.Reader) error
 }
 
-func (s *FileService) FindFileByID(ctx context.Context, id string) (*peapod.File, io.ReadCloser, error) {
-	return s.FindFileByIDFn(ctx, id)
+func (s *FileService) GenerateName(ext string) string {
+	return s.GenerateNameFn(ext)
+}
+
+func (s *FileService) FindFileByName(ctx context.Context, name string) (*peapod.File, io.ReadCloser, error) {
+	return s.FindFileByNameFn(ctx, name)
 }
 
 func (s *FileService) CreateFile(ctx context.Context, f *peapod.File, r io.Reader) error {
