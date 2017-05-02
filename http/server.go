@@ -6,6 +6,7 @@ import (
 	"net"
 	"net/http"
 	"net/url"
+	"path"
 
 	"github.com/middlemost/peapod"
 	"github.com/pressly/chi"
@@ -18,9 +19,11 @@ type Server struct {
 	ln net.Listener
 
 	// Services
-	TrackService    peapod.TrackService
-	PlaylistService peapod.PlaylistService
 	FileService     peapod.FileService
+	JobService      peapod.JobService
+	PlaylistService peapod.PlaylistService
+	SMSService      peapod.SMSService
+	TrackService    peapod.TrackService
 	UserService     peapod.UserService
 
 	// Server options.
@@ -91,15 +94,19 @@ func (s *Server) router() http.Handler {
 
 	// Attach router middleware.
 	r.Use(middleware.RealIP)
+	r.Use(middleware.Logger)
 	if s.Recoverable {
 		r.Use(middleware.Recoverer)
 	}
-	r.Mount("/debug", middleware.Profiler())
+	// r.Mount("/debug", middleware.Profiler())
+	r.Use(s.attachLogOutputToContext)
+	r.Use(s.detectAccept)
 
 	// Create API routes.
 	r.Route("/", func(r chi.Router) {
 		r.Use(middleware.DefaultCompress)
 		r.Get("/ping", s.handlePing)
+		r.Mount("/p", s.playlistHandler()) // alias
 		r.Mount("/playlists", s.playlistHandler())
 		r.Mount("/twilio", s.twilioHandler())
 	})
@@ -121,9 +128,31 @@ func (s *Server) playlistHandler() *playlistHandler {
 
 func (s *Server) twilioHandler() *twilioHandler {
 	h := newTwilioHandler()
-	h.AccountSID = s.Twilio.AccountSID
-	h.PlaylistService = s.PlaylistService
-	h.TrackService = s.TrackService
-	h.UserService = s.UserService
+	h.baseURL = s.URL()
+	h.accountSID = s.Twilio.AccountSID
+	h.jobService = s.JobService
+	h.playlistService = s.PlaylistService
+	h.smsService = s.SMSService
+	h.trackService = s.TrackService
+	h.userService = s.UserService
 	return h
+}
+
+func (s *Server) attachLogOutputToContext(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		next.ServeHTTP(w, r.WithContext(NewContext(r.Context(), s.LogOutput)))
+	})
+}
+
+func (s *Server) detectAccept(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch path.Ext(r.URL.Path) {
+		case ".json":
+			r.Header.Set("Accept", "application/json")
+		case ".rss":
+			r.Header.Set("Accept", "text/xml")
+		}
+
+		next.ServeHTTP(w, r)
+	})
 }

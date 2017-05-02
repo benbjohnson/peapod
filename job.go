@@ -120,20 +120,27 @@ func (s *JobScheduler) monitor() {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
+	// Always check once initially.
+	c := make(chan struct{}, 1)
+	c <- struct{}{}
+
 	for {
 		// Wait for next job or for the scheduler to close.
 		select {
 		case <-s.closing:
 			return
+
+		case <-c:
 		case <-s.JobService.C():
 		}
 
 		// Read next job.
 		job, err := s.JobService.NextJob(ctx)
 		if err != nil {
-			fmt.Fprintf(s.LogOutput, "error: next job: err=%s\n", err)
+			fmt.Fprintf(s.LogOutput, "scheduler: next job error: err=%s\n", err)
 			continue
 		} else if job == nil {
+			fmt.Fprintf(s.LogOutput, "scheduler: no jobs found, skipping\n")
 			continue
 		}
 
@@ -148,28 +155,40 @@ func (s *JobScheduler) monitor() {
 
 // executeJob processes a job in a separate goroutine.
 func (s *JobScheduler) executeJob(ctx context.Context, job *Job) {
+	// Lookup user.
+	user, err := s.UserService.FindUserByID(ctx, job.OwnerID)
+	if err != nil {
+		fmt.Fprintf(s.LogOutput, "scheduler: find job owner error: id=%d err=%q\n", job.OwnerID, err)
+		return
+	} else if user == nil {
+		fmt.Fprintf(s.LogOutput, "scheduler: job owner not found: id=%d\n", job.OwnerID)
+		return
+	}
+
+	// Build context with user.
+	ctx = NewContext(ctx, user)
+
 	// Log job start.
-	fmt.Fprintf(s.LogOutput, "job started: id=%d user=%d\n", job.ID, job.OwnerID)
+	fmt.Fprintf(s.LogOutput, "scheduler: job started: id=%d user=%d\n", job.ID, job.OwnerID)
 
 	// Execute job.
 	ex := JobExecutor{
 		FileService:  s.FileService,
 		SMSService:   s.SMSService,
 		TrackService: s.TrackService,
-		UserService:  s.UserService,
 
 		URLTrackGenerator: s.URLTrackGenerator,
 	}
-	err := ex.ExecuteJob(ctx, job)
+	err = ex.ExecuteJob(ctx, job)
 
 	// Mark job as completed.
 	if e := s.JobService.CompleteJob(ctx, job.ID, err); e != nil {
-		fmt.Fprintf(s.LogOutput, "error: complete job: id=%d err=%s\n", job.ID, e)
+		fmt.Fprintf(s.LogOutput, "scheduler: complete job error: id=%d err=%s\n", job.ID, e)
 		return
 	}
 
 	// Log job completion.
-	fmt.Fprintf(s.LogOutput, "job completed: id=%d user=%d err=%q\n", job.ID, job.OwnerID, errorString(err))
+	fmt.Fprintf(s.LogOutput, "scheduler: job completed: id=%d user=%d err=%q\n", job.ID, job.OwnerID, errorString(err))
 }
 
 // JobExecutor represents a worker that executes a job.
@@ -177,7 +196,6 @@ type JobExecutor struct {
 	FileService  FileService
 	SMSService   SMSService
 	TrackService TrackService
-	UserService  UserService
 
 	URLTrackGenerator URLTrackGenerator
 }
@@ -194,18 +212,12 @@ func (e *JobExecutor) ExecuteJob(ctx context.Context, job *Job) error {
 
 // createTrackFromURL generates a new track based on a URL.
 func (e *JobExecutor) createTrackFromURL(ctx context.Context, job *Job) error {
+	user := FromContext(ctx)
+
 	// Parse URL.
 	u, err := url.Parse(job.URL)
 	if err != nil {
 		return ErrInvalidURL
-	}
-
-	// Lookup user.
-	user, err := e.UserService.FindUserByID(ctx, job.OwnerID)
-	if err != nil {
-		return err
-	} else if user == nil {
-		return ErrUserNotFound
 	}
 
 	// Generate track & file contents from a URL.
@@ -233,7 +245,7 @@ func (e *JobExecutor) createTrackFromURL(ctx context.Context, job *Job) error {
 	// Notify user of success.
 	msg := &SMS{
 		To:   user.MobileNumber,
-		Body: `Finished processing. You track has been added to your playlist.`,
+		Body: `Finished processing. Your track has been added to your playlist.`,
 	}
 	if err := e.SMSService.SendSMS(ctx, msg); err != nil {
 		return err

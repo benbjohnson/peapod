@@ -30,7 +30,7 @@ func (s *JobService) C() <-chan struct{} { return s.c }
 
 // CreateJob creates adds a job to the job queue.
 func (s *JobService) CreateJob(ctx context.Context, job *peapod.Job) error {
-	tx, err := s.db.BeginAuth(ctx, true)
+	tx, err := s.db.Begin(ctx, true)
 	if err != nil {
 		return err
 	}
@@ -46,7 +46,7 @@ func (s *JobService) CreateJob(ctx context.Context, job *peapod.Job) error {
 		return nil
 	}(); err != nil {
 		job.ID = 0
-		return nil
+		return err
 	}
 
 	// Signal change notification.
@@ -60,25 +60,27 @@ func (s *JobService) CreateJob(ctx context.Context, job *peapod.Job) error {
 
 // NextJob returns the next job in the job queue and marks it as started.
 func (s *JobService) NextJob(ctx context.Context) (*peapod.Job, error) {
-	tx, err := s.db.BeginAuth(ctx, true)
+	tx, err := s.db.Begin(ctx, true)
 	if err != nil {
 		return nil, err
 	}
 	defer tx.Rollback()
 
 	// Retrieve next job id.
-	id := nextJobID(ctx, tx)
-	if id == 0 {
+	job, err := nextJob(ctx, tx)
+	if err != nil {
+		return nil, err
+	} else if job == nil {
 		return nil, nil
 	}
 
 	// Mark job as started.
-	if err := setJobStatus(ctx, tx, id, peapod.JobStatusProcessing, nil); err != nil {
+	if err := setJobStatus(ctx, tx, job.ID, peapod.JobStatusProcessing, nil); err != nil {
 		return nil, err
 	}
 
-	// Fetch job.
-	job, err := findJobByID(ctx, tx, id)
+	// Re-fetch job.
+	job, err = findJobByID(ctx, tx, job.ID)
 	if err != nil {
 		return nil, err
 	}
@@ -101,7 +103,7 @@ func (s *JobService) NextJob(ctx context.Context) (*peapod.Job, error) {
 
 // CompleteJob marks a job as completed or failed.
 func (s *JobService) CompleteJob(ctx context.Context, id int, e error) error {
-	tx, err := s.db.BeginAuth(ctx, true)
+	tx, err := s.db.Begin(ctx, true)
 	if err != nil {
 		return err
 	}
@@ -126,7 +128,7 @@ func (s *JobService) CompleteJob(ctx context.Context, id int, e error) error {
 // ResetJobQueue resets all queued jobs to a pending status.
 // This should be called when the process starts so that all jobs are restarted.
 func (s *JobService) ResetJobQueue(ctx context.Context) error {
-	tx, err := s.db.BeginAuth(ctx, true)
+	tx, err := s.db.Begin(ctx, true)
 	if err != nil {
 		return err
 	}
@@ -200,9 +202,9 @@ func createJob(ctx context.Context, tx *Tx, job *peapod.Job) error {
 
 func saveJob(ctx context.Context, tx *Tx, job *peapod.Job) error {
 	// Validate record.
-	if peapod.IsValidJobType(job.Type) {
+	if !peapod.IsValidJobType(job.Type) {
 		return peapod.ErrInvalidJobType
-	} else if peapod.IsValidJobStatus(job.Status) {
+	} else if !peapod.IsValidJobStatus(job.Status) {
 		return peapod.ErrInvalidJobStatus
 	} else if job.OwnerID == 0 {
 		return peapod.ErrJobOwnerRequired
@@ -253,18 +255,24 @@ func setJobStatus(ctx context.Context, tx *Tx, id int, status string, e error) e
 	return nil
 }
 
-// nextJobID returns the next job in the job queue. Returns zero if queue is empty.
-func nextJobID(ctx context.Context, tx *Tx) int {
+// nextJob returns the next pending job in the job queue.
+func nextJob(ctx context.Context, tx *Tx) (*peapod.Job, error) {
 	bkt := tx.Bucket([]byte("JobQueue"))
 	if bkt == nil {
-		return 0
+		return nil, nil
 	}
 
-	_, v := bkt.Cursor().First()
-	if v == nil {
-		return 0
+	cur := bkt.Cursor()
+	for k, v := cur.First(); k != nil; k, v = cur.Next() {
+		job, err := findJobByID(ctx, tx, btoi(v))
+		if err != nil {
+			return nil, err
+		} else if job.Status == peapod.JobStatusPending {
+			return job, nil
+		}
 	}
-	return btoi(v)
+
+	return nil, nil
 }
 
 // addJobToQueue appends a job to the end of the queue.

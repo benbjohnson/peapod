@@ -34,7 +34,7 @@ func (h *playlistHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 func (h *playlistHandler) handleGet(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
-	token := chi.URLParam(r, "token")
+	token := strings.TrimSuffix(chi.URLParam(r, "token"), ".rss")
 
 	// Fetch playlist by token.
 	playlist, err := h.playlistService.FindPlaylistByToken(ctx, token)
@@ -72,38 +72,29 @@ func (h *playlistHandler) handleGet(w http.ResponseWriter, r *http.Request) {
 		}
 
 		w.Header().Set("Context-Type", "text/xml")
-		if err := xml.NewEncoder(w).Encode(&twilioResponse{Message: "Peapod does not support voice calls. Please text me instead."}); err != nil {
+		if err := xml.NewEncoder(w).EncodeElement(
+			rss,
+			xml.StartElement{
+				Name: xml.Name{Local: "rss"},
+				Attr: []xml.Attr{
+					{Name: xml.Name{Local: "version"}, Value: "2.0"},
+				},
+			},
+		); err != nil {
 			Error(ctx, w, r, err)
 			return
 		}
+
+	default:
+		Error(ctx, w, r, ErrNotAcceptable)
 	}
 }
 
 // playlistRSS represents an RSS feed for a playlist.
 type playlistRSS struct {
-	Title         string
-	LastBuildDate string
-	Items         []itemRSS
-}
-
-func (rss *playlistRSS) MarshalXML(e *xml.Encoder, start xml.StartElement) error {
-	start.Name = xml.Name{Local: "rss"}
-	start.Attr = []xml.Attr{
-		{Name: xml.Name{Local: "version"}, Value: "2.0"},
-	}
-
-	return e.EncodeElement(
-		struct {
-			Title         string    `xml:"channel>title"`
-			LastBuildDate string    `xml:"channel>lastBuildDate"`
-			Items         []itemRSS `xml:"channel>item"`
-		}{
-			Title:         rss.Title,
-			LastBuildDate: rss.LastBuildDate,
-			Items:         rss.Items,
-		},
-		start,
-	)
+	Title         string    `xml:"channel>title"`
+	LastBuildDate string    `xml:"channel>lastBuildDate"`
+	Items         []itemRSS `xml:"channel>item"`
 }
 
 type itemRSS struct {

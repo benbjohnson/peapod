@@ -3,7 +3,6 @@ package http
 import (
 	"context"
 	"encoding/json"
-	"encoding/xml"
 	"fmt"
 	"net/http"
 	"strings"
@@ -11,8 +10,13 @@ import (
 	"github.com/middlemost/peapod"
 )
 
+const (
+	ErrNotAcceptable = peapod.Error("not acceptable")
+)
+
 // errorMap is a whitelist that maps errors to status codes.
 var errorMap = map[error]int{
+	ErrNotAcceptable:         http.StatusNotAcceptable,
 	ErrTwilioAccountMismatch: http.StatusBadRequest,
 	ErrInvalidSMSRequestBody: http.StatusBadRequest,
 }
@@ -42,11 +46,6 @@ func Error(ctx context.Context, w http.ResponseWriter, r *http.Request, err erro
 
 	// Write response.
 	switch {
-	case strings.Contains(r.Header.Get("Accept"), "text/xml"): // twilio only
-		w.Header().Set("Context-Type", "text/xml")
-		w.WriteHeader(code)
-		xml.NewEncoder(w).Encode(&twilioResponse{Message: err.Error()})
-
 	case strings.Contains(r.Header.Get("Accept"), "application/json"):
 		w.Header().Set("Context-Type", "application/json")
 		w.WriteHeader(code)

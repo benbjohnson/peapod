@@ -7,13 +7,19 @@ import (
 
 // Playlist errors.
 const (
-	ErrPlaylistRequired = Error("playlist required")
-	ErrPlaylistNotFound = Error("playlist not found")
+	ErrPlaylistRequired      = Error("playlist required")
+	ErrPlaylistNotFound      = Error("playlist not found")
+	ErrPlaylistOwnerRequired = Error("playlist owner required")
+	ErrPlaylistTokenRequired = Error("playlist token required")
+	ErrPlaylistNameRequired  = Error("playlist name required")
 )
+
+const DefaultPlaylistName = "default"
 
 // Playlist represents a time-ordered list of tracks.
 type Playlist struct {
 	ID        int       `json:"id"`
+	OwnerID   int       `json:"owner_id"`
 	Token     string    `json:"token"`
 	Name      string    `json:"name"`
 	CreatedAt time.Time `json:"created_at"`

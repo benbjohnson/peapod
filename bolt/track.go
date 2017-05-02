@@ -101,6 +101,9 @@ func saveTrack(ctx context.Context, tx *Tx, track *peapod.Track) error {
 		return peapod.ErrTrackFileRequired
 	}
 
+	// Update timestamps.
+	track.UpdatedAt = tx.Now
+
 	// Marshal and update record.
 	if buf, err := marshalTrack(track); err != nil {
 		return err

@@ -13,16 +13,21 @@ var _ peapod.UserService = &UserService{}
 // UserService represents a service to manage users.
 type UserService struct {
 	db *DB
+
+	GenerateToken func() string
 }
 
 // NewUserService returns a new instance of UserService.
 func NewUserService(db *DB) *UserService {
-	return &UserService{db: db}
+	return &UserService{
+		db:            db,
+		GenerateToken: MustGenerateToken,
+	}
 }
 
 // FindUserByID returns a user with a given id.
 func (s *UserService) FindUserByID(ctx context.Context, id int) (*peapod.User, error) {
-	tx, err := s.db.BeginAuth(ctx, false)
+	tx, err := s.db.Begin(ctx, false)
 	if err != nil {
 		return nil, err
 	}
@@ -37,7 +42,7 @@ func (s *UserService) FindUserByID(ctx context.Context, id int) (*peapod.User, e
 
 // FindUserByMobileNumber returns a user by mobile number.
 func (s *UserService) FindUserByMobileNumber(ctx context.Context, mobileNumber string) (*peapod.User, error) {
-	tx, err := s.db.BeginAuth(ctx, false)
+	tx, err := s.db.Begin(ctx, false)
 	if err != nil {
 		return nil, err
 	}
@@ -55,36 +60,25 @@ func (s *UserService) FindUserByMobileNumber(ctx context.Context, mobileNumber s
 	return user, nil
 }
 
-// FindOrCreateUserByMobileNumber returns an existing user by mobile number.
-// If a user is not found then a new one is created.
-func (s *UserService) FindOrCreateUserByMobileNumber(ctx context.Context, mobileNumber string) (*peapod.User, error) {
-	tx, err := s.db.BeginAuth(ctx, true)
+// CreateUser creates a new user.
+func (s *UserService) CreateUser(ctx context.Context, user *peapod.User) error {
+	tx, err := s.db.Begin(ctx, true)
 	if err != nil {
-		return nil, err
+		return err
 	}
 	defer tx.Rollback()
 
-	// Find existing user by number.
-	if id := findUserIDByMobileNumber(ctx, tx, mobileNumber); id != 0 {
-		if user, err := findUserByID(ctx, tx, id); err != nil {
-			return nil, err
-		} else if user != nil {
-			return user, nil
+	// Create user & commit.
+	if err := func() error {
+		if err := createUser(ctx, tx, user); err != nil {
+			return err
 		}
+		return tx.Commit()
+	}(); err != nil {
+		user.ID = 0
+		return err
 	}
-
-	// Create a user if one doesn't exist.
-	user := &peapod.User{MobileNumber: mobileNumber}
-	if err := createUser(ctx, tx, user); err != nil {
-		return nil, err
-	}
-
-	// Commit changes.
-	if err := tx.Commit(); err != nil {
-		return nil, err
-	}
-
-	return user, nil
+	return nil
 }
 
 func findUserByID(ctx context.Context, tx *Tx, id int) (*peapod.User, error) {
@@ -150,6 +144,14 @@ func createUser(ctx context.Context, tx *Tx, user *peapod.User) error {
 	if bkt, err := tx.CreateBucketIfNotExists([]byte("Users.MobileNumber")); err != nil {
 		return err
 	} else if err := bkt.Put([]byte(user.MobileNumber), itob(user.ID)); err != nil {
+		return err
+	}
+
+	// Create a default playlist.
+	if err := createPlaylist(ctx, tx, &peapod.Playlist{
+		OwnerID: user.ID,
+		Name:    peapod.DefaultPlaylistName,
+	}); err != nil {
 		return err
 	}
 

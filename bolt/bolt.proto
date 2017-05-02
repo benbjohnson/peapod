@@ -16,9 +16,11 @@ message Job {
 
 message Playlist {
   int64 ID = 1;
-  string Name = 2;
-  int64 CreatedAt = 3;
-  int64 UpdatedAt = 44;
+  int64 OwnerID = 2;
+  string Token = 3;
+  string Name = 4;
+  int64 CreatedAt = 5;
+  int64 UpdatedAt = 6;
 }
 
 message Track {

@@ -197,15 +197,18 @@ func (m *Main) Run() error {
 	httpServer.LogOutput = m.Stdout
 
 	httpServer.FileService = fileService
-	httpServer.TrackService = trackService
+	httpServer.JobService = jobService
 	httpServer.PlaylistService = playlistService
+	httpServer.SMSService = smsService
+	httpServer.TrackService = trackService
 	httpServer.UserService = userService
 
 	// Open HTTP server.
 	if err := httpServer.Open(); err != nil {
 		return err
 	}
-	fmt.Fprintf(m.Stdout, "http listening: %s\n", httpServer.URL())
+	u := httpServer.URL()
+	fmt.Fprintf(m.Stdout, "http listening: %s\n", u.String())
 
 	// Assign close function.
 	m.closeFn = func() error {

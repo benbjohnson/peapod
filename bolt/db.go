@@ -2,6 +2,8 @@ package bolt
 
 import (
 	"context"
+	"crypto/rand"
+	"fmt"
 	"os"
 	"path/filepath"
 	"time"
@@ -14,14 +16,16 @@ import (
 type DB struct {
 	db *bolt.DB
 
-	Path string
-	Now  func() time.Time
+	Path          string
+	Now           func() time.Time
+	GenerateToken func() string
 }
 
 // NewDB returns a new instance of DB.
 func NewDB() *DB {
 	return &DB{
-		Now: time.Now,
+		Now:           time.Now,
+		GenerateToken: MustGenerateToken,
 	}
 }
 
@@ -56,7 +60,7 @@ func (db *DB) Begin(ctx context.Context, writable bool) (*Tx, error) {
 	if err != nil {
 		return nil, err
 	}
-	return &Tx{Tx: tx, Now: db.Now()}, nil
+	return &Tx{Tx: tx, Now: db.Now(), GenerateToken: db.GenerateToken}, nil
 }
 
 // BeginAuth starts a new transaction and verifies that a user is authenticated.
@@ -71,7 +75,8 @@ func (db *DB) BeginAuth(ctx context.Context, writable bool) (*Tx, error) {
 // Tx is a wrapper for bolt.Tx.
 type Tx struct {
 	*bolt.Tx
-	Now time.Time
+	Now           time.Time
+	GenerateToken func() string
 }
 
 func errorString(err error) string {
@@ -79,4 +84,13 @@ func errorString(err error) string {
 		return err.Error()
 	}
 	return ""
+}
+
+// MustGenerateToken returns a random string.
+func MustGenerateToken() string {
+	buf := make([]byte, 20)
+	if _, err := rand.Read(buf); err != nil {
+		panic(err)
+	}
+	return fmt.Sprintf("%x", buf)
 }

@@ -23,7 +23,7 @@ func NewPlaylistService(db *DB) *PlaylistService {
 
 // FindPlaylistByID returns a playlist and its tracks by id.
 func (s *PlaylistService) FindPlaylistByID(ctx context.Context, id int) (*peapod.Playlist, error) {
-	tx, err := s.db.BeginAuth(ctx, false)
+	tx, err := s.db.Begin(ctx, false)
 	if err != nil {
 		return nil, err
 	}
@@ -47,7 +47,7 @@ func (s *PlaylistService) FindPlaylistByID(ctx context.Context, id int) (*peapod
 
 // FindPlaylistByToken returns a playlist and its tracks by token.
 func (s *PlaylistService) FindPlaylistByToken(ctx context.Context, token string) (*peapod.Playlist, error) {
-	tx, err := s.db.BeginAuth(ctx, false)
+	tx, err := s.db.Begin(ctx, false)
 	if err != nil {
 		return nil, err
 	}
@@ -77,7 +77,7 @@ func (s *PlaylistService) FindPlaylistByToken(ctx context.Context, token string)
 
 // FindPlaylistsByUserID returns a list of all playlists for a user.
 func (s *PlaylistService) FindPlaylistsByUserID(ctx context.Context, id int) ([]*peapod.Playlist, error) {
-	tx, err := s.db.BeginAuth(ctx, false)
+	tx, err := s.db.Begin(ctx, false)
 	if err != nil {
 		return nil, err
 	}
@@ -141,9 +141,77 @@ func findPlaylistsByUserID(ctx context.Context, tx *Tx, id int) ([]*peapod.Playl
 	return a, nil
 }
 
+func createPlaylist(ctx context.Context, tx *Tx, playlist *peapod.Playlist) error {
+	if playlist == nil {
+		return peapod.ErrPlaylistRequired
+	}
+
+	bkt, err := tx.CreateBucketIfNotExists([]byte("Playlists"))
+	if err != nil {
+		return err
+	}
+
+	// Retrieve next sequence.
+	id, _ := bkt.NextSequence()
+	playlist.ID = int(id)
+
+	// Generate external token.
+	playlist.Token = tx.GenerateToken()
+
+	// Update timestamps.
+	playlist.CreatedAt = tx.Now
+
+	// Save data.
+	if err := savePlaylist(ctx, tx, playlist); err != nil {
+		return err
+	}
+
+	// Index by owner.
+	if err := updateIndex(ctx, tx, []byte("Users.Playlists"), 0, 0, playlist.OwnerID, playlist.ID); err != nil {
+		return err
+	}
+
+	// Index by token.
+	if bkt, err := tx.CreateBucketIfNotExists([]byte("Playlists.Token")); err != nil {
+		return err
+	} else if err := bkt.Put([]byte(playlist.Token), itob(playlist.ID)); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func savePlaylist(ctx context.Context, tx *Tx, playlist *peapod.Playlist) error {
+	// Validate record.
+	if playlist.OwnerID == 0 {
+		return peapod.ErrPlaylistOwnerRequired
+	} else if !userExists(ctx, tx, playlist.OwnerID) {
+		return peapod.ErrUserNotFound
+	} else if playlist.Token == "" {
+		return peapod.ErrPlaylistTokenRequired
+	} else if playlist.Name == "" {
+		return peapod.ErrPlaylistNameRequired
+	}
+
+	// Update timestamp.
+	playlist.UpdatedAt = tx.Now
+
+	// Marshal and update record.
+	if buf, err := marshalPlaylist(playlist); err != nil {
+		return err
+	} else if bkt, err := tx.CreateBucketIfNotExists([]byte("Playlists")); err != nil {
+		return err
+	} else if err := bkt.Put(itob(playlist.ID), buf); err != nil {
+		return err
+	}
+	return nil
+}
+
 func marshalPlaylist(v *peapod.Playlist) ([]byte, error) {
 	return proto.Marshal(&Playlist{
 		ID:        int64(v.ID),
+		OwnerID:   int64(v.OwnerID),
+		Token:     v.Token,
 		Name:      v.Name,
 		CreatedAt: encodeTime(v.CreatedAt),
 		UpdatedAt: encodeTime(v.UpdatedAt),
@@ -157,6 +225,8 @@ func unmarshalPlaylist(data []byte, v *peapod.Playlist) error {
 	}
 	*v = peapod.Playlist{
 		ID:        int(pb.ID),
+		OwnerID:   int(pb.OwnerID),
+		Token:     pb.Token,
 		Name:      pb.Name,
 		CreatedAt: decodeTime(pb.CreatedAt),
 		UpdatedAt: decodeTime(pb.UpdatedAt),
