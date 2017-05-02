@@ -37,4 +37,5 @@ func (p *Playlist) LastTrackUpdatedAt() time.Time {
 type PlaylistService interface {
 	FindPlaylistByID(ctx context.Context, id int) (*Playlist, error)
 	FindPlaylistByToken(ctx context.Context, token string) (*Playlist, error)
+	FindPlaylistsByUserID(ctx context.Context, id int) ([]*Playlist, error)
 }

@@ -1,6 +1,7 @@
 package bolt
 
 import (
+	"bytes"
 	"context"
 
 	"github.com/gogo/protobuf/proto"
@@ -74,6 +75,16 @@ func (s *PlaylistService) FindPlaylistByToken(ctx context.Context, token string)
 	return playlist, nil
 }
 
+// FindPlaylistsByUserID returns a list of all playlists for a user.
+func (s *PlaylistService) FindPlaylistsByUserID(ctx context.Context, id int) ([]*peapod.Playlist, error) {
+	tx, err := s.db.BeginAuth(ctx, false)
+	if err != nil {
+		return nil, err
+	}
+	defer tx.Rollback()
+	return findPlaylistsByUserID(ctx, tx, id)
+}
+
 func findPlaylistByID(ctx context.Context, tx *Tx, id int) (*peapod.Playlist, error) {
 	bkt := tx.Bucket([]byte("Playlists"))
 	if bkt == nil {
@@ -107,6 +118,27 @@ func findPlaylistIDByToken(ctx context.Context, tx *Tx, token string) int {
 		return 0
 	}
 	return btoi(v)
+}
+
+func findPlaylistsByUserID(ctx context.Context, tx *Tx, id int) ([]*peapod.Playlist, error) {
+	bkt := tx.Bucket([]byte("Users.Playlists"))
+	if bkt == nil {
+		return nil, nil
+	}
+
+	cur := bkt.Cursor()
+	prefix := itob(id)
+	a := make([]*peapod.Playlist, 0, 1)
+	for k, _ := cur.Seek(prefix); bytes.HasPrefix(k, prefix); k, _ = cur.Next() {
+		playlistID := btoi(k[8:])
+		playlist, err := findPlaylistByID(ctx, tx, playlistID)
+		if err != nil {
+			return nil, err
+		}
+		assert(playlist != nil, "indexed playlist not found: id=%d", playlistID)
+		a = append(a, playlist)
+	}
+	return a, nil
 }
 
 func marshalPlaylist(v *peapod.Playlist) ([]byte, error) {

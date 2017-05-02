@@ -3,6 +3,7 @@ package bolt
 import (
 	"bytes"
 	"context"
+	"time"
 
 	"github.com/gogo/protobuf/proto"
 	"github.com/middlemost/peapod"
@@ -139,7 +140,7 @@ func marshalTrack(v *peapod.Track) ([]byte, error) {
 		ContentType: v.ContentType,
 		Title:       v.Title,
 		Duration:    int64(v.Duration),
-		Size:        int64(v.Size),
+		FileSize:    int64(v.Size),
 		CreatedAt:   encodeTime(v.CreatedAt),
 		UpdatedAt:   encodeTime(v.UpdatedAt),
 	})
@@ -156,8 +157,8 @@ func unmarshalTrack(data []byte, v *peapod.Track) error {
 		FileID:      pb.FileID,
 		ContentType: pb.ContentType,
 		Title:       pb.Title,
-		Duration:    time.Duration(v.Duration),
-		Size:        int(v.Size),
+		Duration:    time.Duration(pb.Duration),
+		Size:        int(pb.FileSize),
 		CreatedAt:   decodeTime(pb.CreatedAt),
 		UpdatedAt:   decodeTime(pb.UpdatedAt),
 	}

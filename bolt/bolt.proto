@@ -28,7 +28,7 @@ message Track {
   string ContentType = 4;
   string Title = 5;
   int64 Duration = 6;
-  int64 Size = 7;
+  int64 FileSize = 7;
   int64 CreatedAt = 8;
   int64 UpdatedAt = 9;
 }
