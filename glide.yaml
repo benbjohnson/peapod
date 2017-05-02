@@ -1,0 +1,14 @@
+package: github.com/middlemost/peapod
+import:
+- package: github.com/BurntSushi/toml
+- package: github.com/boltdb/bolt
+- package: github.com/gogo/protobuf
+  subpackages:
+  - proto
+- package: github.com/pressly/chi
+  subpackages:
+  - middleware
+- package: github.com/subosito/twilio
+- package: golang.org/x/crypto
+  subpackages:
+  - acme/autocert

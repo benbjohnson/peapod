@@ -1,0 +1,27 @@
+hash: db89749bce704d892516cf94a338ae8af08f6674a8bbaf28c4421d0c3ae740d8
+updated: 2017-05-02T07:43:53.848838261-06:00
+imports:
+- name: github.com/boltdb/bolt
+  version: 4b1ebc1869ad66568b313d0dc410e2be72670dda
+- name: github.com/BurntSushi/toml
+  version: 99064174e013895bbd9b025c31100bd1d9b590ca
+- name: github.com/gogo/protobuf
+  version: a9cd0c35b97daf74d0ebf3514c5254814b2703b4
+  subpackages:
+  - proto
+- name: github.com/pressly/chi
+  version: 7765b0916fdc6791938554e9d53d39cae059ac8c
+  subpackages:
+  - middleware
+- name: github.com/subosito/twilio
+  version: ef2f13504366093ed052627008181166612c646d
+- name: golang.org/x/crypto
+  version: cbc3d0884eac986df6e78a039b8792e869bff863
+  subpackages:
+  - acme
+  - acme/autocert
+- name: golang.org/x/sys
+  version: c200b10b5d5e122be351b67af224adc6128af5bf
+  subpackages:
+  - unix
+testImports: []
