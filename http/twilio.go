@@ -84,7 +84,7 @@ func (h *twilioHandler) handlePostSMS(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Fetch user playlists.
-	playlists, err := h.UserService.UserPlaylists(ctx, user.ID)
+	playlists, err := h.PlaylistService.FindPlaylistsByUserID(ctx, user.ID)
 	if err != nil {
 		Error(ctx, w, r, err)
 		return

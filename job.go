@@ -2,7 +2,11 @@ package peapod
 
 import (
 	"context"
+	"fmt"
+	"io"
+	"io/ioutil"
 	"net/url"
+	"sync"
 	"time"
 )
 
@@ -65,9 +69,107 @@ type Job struct {
 
 // JobService manages jobs in a job queue.
 type JobService interface {
+	// Notification channel when a new job is ready.
+	C() <-chan struct{}
+
 	CreateJob(ctx context.Context, job *Job) error
 	NextJob(ctx context.Context) (*Job, error)
 	CompleteJob(ctx context.Context, id int, err error) error
+}
+
+// JobScheduler receives new jobs and schedules them for execution.
+type JobScheduler struct {
+	once    sync.Once
+	closing chan struct{}
+	wg      sync.WaitGroup
+
+	FileService       FileService
+	JobService        JobService
+	SMSService        SMSService
+	TrackService      TrackService
+	UserService       UserService
+	URLTrackGenerator URLTrackGenerator
+
+	LogOutput io.Writer
+}
+
+// NewJobScheduler returns a new instance of JobScheduler.
+func NewJobScheduler() *JobScheduler {
+	return &JobScheduler{
+		closing:   make(chan struct{}),
+		LogOutput: ioutil.Discard,
+	}
+}
+
+// Open initializes the job processing queue.
+func (s *JobScheduler) Open() error {
+	s.wg.Add(1)
+	go func() { defer s.wg.Done(); s.monitor() }()
+	return nil
+}
+
+// Close stops the job processing queue and waits for outstanding workers.
+func (s *JobScheduler) Close() error {
+	s.once.Do(func() { close(s.closing) })
+	s.wg.Wait()
+	return nil
+}
+
+// monitor waits for notifications from the job service and starts jobs.
+func (s *JobScheduler) monitor() {
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	for {
+		// Wait for next job or for the scheduler to close.
+		select {
+		case <-s.closing:
+			return
+		case <-s.JobService.C():
+		}
+
+		// Read next job.
+		job, err := s.JobService.NextJob(ctx)
+		if err != nil {
+			fmt.Fprintf(s.LogOutput, "error: next job: err=%s\n", err)
+			continue
+		} else if job == nil {
+			continue
+		}
+
+		// Launch job processing in a separate goroutine.
+		s.wg.Add(1)
+		go func(ctx context.Context, job *Job) {
+			defer s.wg.Done()
+			s.executeJob(ctx, job)
+		}(ctx, job)
+	}
+}
+
+// executeJob processes a job in a separate goroutine.
+func (s *JobScheduler) executeJob(ctx context.Context, job *Job) {
+	// Log job start.
+	fmt.Fprintf(s.LogOutput, "job started: id=%d user=%d\n", job.ID, job.OwnerID)
+
+	// Execute job.
+	ex := JobExecutor{
+		FileService:  s.FileService,
+		SMSService:   s.SMSService,
+		TrackService: s.TrackService,
+		UserService:  s.UserService,
+
+		URLTrackGenerator: s.URLTrackGenerator,
+	}
+	err := ex.ExecuteJob(ctx, job)
+
+	// Mark job as completed.
+	if e := s.JobService.CompleteJob(ctx, job.ID, err); e != nil {
+		fmt.Fprintf(s.LogOutput, "error: complete job: id=%d err=%s\n", job.ID, e)
+		return
+	}
+
+	// Log job completion.
+	fmt.Fprintf(s.LogOutput, "job completed: id=%d user=%d err=%q\n", job.ID, job.OwnerID, errorString(err))
 }
 
 // JobExecutor represents a worker that executes a job.
@@ -138,4 +240,11 @@ func (e *JobExecutor) createTrackFromURL(ctx context.Context, job *Job) error {
 	}
 
 	return nil
+}
+
+func errorString(err error) string {
+	if err != nil {
+		return err.Error()
+	}
+	return ""
 }

@@ -2,9 +2,6 @@ package bolt
 
 import (
 	"context"
-	"fmt"
-	"io"
-	"sync"
 
 	"github.com/gogo/protobuf/proto"
 	"github.com/middlemost/peapod"
@@ -17,35 +14,19 @@ var _ peapod.JobService = &JobService{}
 type JobService struct {
 	db *DB
 
-	notify chan struct{}
-	wg     sync.WaitGroup
-
-	FileService       peapod.FileService
-	SMSService        peapod.SMSService
-	TrackService      peapod.TrackService
-	UserService       peapod.UserService
-	URLTrackGenerator peapod.URLTrackGenerator
-
-	LogOutput io.Writer
+	c chan struct{}
 }
 
 // NewJobService returns a new instance of JobService.
 func NewJobService(db *DB) *JobService {
-	return &JobService{db: db}
+	return &JobService{
+		db: db,
+		c:  make(chan struct{}, 1),
+	}
 }
 
-// Open initializes the job processing queue.
-func (s *JobService) Open() error {
-	s.notify = make(chan struct{}, 1)
-	return nil
-}
-
-// Close stops the job processing queue and waits for outstanding workers.
-func (s *JobService) Close() error {
-	close(s.notify)
-	s.wg.Wait()
-	return nil
-}
+// C returns a channel that sends notifications of new jobs.
+func (s *JobService) C() <-chan struct{} { return s.c }
 
 // CreateJob creates adds a job to the job queue.
 func (s *JobService) CreateJob(ctx context.Context, job *peapod.Job) error {
@@ -70,7 +51,7 @@ func (s *JobService) CreateJob(ctx context.Context, job *peapod.Job) error {
 
 	// Signal change notification.
 	select {
-	case s.notify <- struct{}{}:
+	case s.c <- struct{}{}:
 	default:
 	}
 
@@ -312,61 +293,6 @@ func removeJobFromQueue(ctx context.Context, tx *Tx, id int) error {
 		}
 	}
 	return nil
-}
-
-// monitorJobQueue waits for notifications
-func (s *JobService) monitorJobQueue() {
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
-
-	for {
-		// Wait for next change notification. Exit on close.
-		if _, ok := <-s.notify; !ok {
-			return
-		}
-
-		// Read next job.
-		job, err := s.NextJob(ctx)
-		if err != nil {
-			fmt.Fprintf(s.LogOutput, "error: next job: err=%s\n", err)
-			continue
-		} else if job == nil {
-			continue
-		}
-
-		// Launch job processing in a separate goroutine.
-		s.wg.Add(1)
-		go func(ctx context.Context, job *peapod.Job) {
-			defer s.wg.Done()
-			s.executeJob(ctx, job)
-		}(ctx, job)
-	}
-}
-
-// executeJob processes a job in a separate goroutine.
-func (s *JobService) executeJob(ctx context.Context, job *peapod.Job) {
-	// Log job start.
-	fmt.Fprintf(s.LogOutput, "job started: id=%d user=%d\n", job.ID, job.OwnerID)
-
-	// Execute job.
-	p := peapod.JobExecutor{
-		FileService:  s.FileService,
-		SMSService:   s.SMSService,
-		TrackService: s.TrackService,
-		UserService:  s.UserService,
-
-		URLTrackGenerator: s.URLTrackGenerator,
-	}
-	err := p.ExecuteJob(ctx, job)
-
-	// Mark job as completed.
-	if e := s.CompleteJob(ctx, job.ID, err); err != nil {
-		fmt.Fprintf(s.LogOutput, "error: complete job: id=%d err=%s\n", job.ID, e)
-		return
-	}
-
-	// Log job completion.
-	fmt.Fprintf(s.LogOutput, "job completed: id=%d user=%d err=%q\n", job.ID, job.OwnerID, errorString(err))
 }
 
 func marshalJob(v *peapod.Job) ([]byte, error) {

@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"errors"
 	"flag"
 	"fmt"
@@ -13,9 +14,12 @@ import (
 	"strings"
 
 	"github.com/BurntSushi/toml"
+	"github.com/middlemost/peapod"
 	"github.com/middlemost/peapod/bolt"
 	"github.com/middlemost/peapod/http"
 	"github.com/middlemost/peapod/local"
+	"github.com/middlemost/peapod/twilio"
+	"github.com/middlemost/peapod/youtube_dl"
 )
 
 func main() {
@@ -45,7 +49,7 @@ func main() {
 	c := make(chan os.Signal, 1)
 	signal.Notify(c, os.Interrupt)
 	<-c
-	fmt.Fprintln(m.Stderr, "received interrupt, shutting down...")
+	fmt.Fprintln(m.Stdout, "received interrupt, shutting down...")
 }
 
 // Main represents the main program execution.
@@ -136,8 +140,20 @@ func (m *Main) Run() error {
 	}
 
 	// Initialize file service.
-	fileService := local.NewFileService(filePath)
+	fileService := local.NewFileService()
+	fileService.Path = filePath
 	fmt.Fprintf(m.Stdout, "file storage: path=%s\n", m.Config.File.Path)
+
+	// Initialize Twilio service.
+	smsService := twilio.NewSMSService()
+	smsService.AccountSID = m.Config.Twilio.AccountSID
+	smsService.AuthToken = m.Config.Twilio.AuthToken
+	smsService.From = m.Config.Twilio.From
+	smsService.LogOutput = m.Stdout
+
+	// Initialize youtube-dl.
+	urlTrackGenerator := youtube_dl.NewURLTrackGenerator()
+	urlTrackGenerator.Proxy = m.Config.YoutubeDL.Proxy
 
 	// Open database.
 	db := bolt.NewDB()
@@ -159,8 +175,17 @@ func (m *Main) Run() error {
 	}
 
 	// Start job scheduler.
-	if err := jobService.Open(); err != nil {
-		return fmt.Errorf("error: open job service: %s", err)
+	jobScheduler := peapod.NewJobScheduler()
+	jobScheduler.FileService = fileService
+	jobScheduler.JobService = jobService
+	jobScheduler.SMSService = smsService
+	jobScheduler.TrackService = trackService
+	jobScheduler.UserService = userService
+	jobScheduler.URLTrackGenerator = urlTrackGenerator
+	jobScheduler.LogOutput = m.Stdout
+
+	if err := jobScheduler.Open(); err != nil {
+		return fmt.Errorf("error: open job scheduler: %s", err)
 	}
 
 	// Initialize HTTP server.
@@ -169,7 +194,7 @@ func (m *Main) Run() error {
 	httpServer.Host = m.Config.HTTP.Host
 	httpServer.Autocert = m.Config.HTTP.Autocert
 	httpServer.Twilio.AccountSID = m.Config.Twilio.AccountSID
-	httpServer.LogOutput = m.Stderr
+	httpServer.LogOutput = m.Stdout
 
 	httpServer.FileService = fileService
 	httpServer.TrackService = trackService
@@ -185,7 +210,7 @@ func (m *Main) Run() error {
 	// Assign close function.
 	m.closeFn = func() error {
 		httpServer.Close()
-		jobService.Close()
+		jobScheduler.Close()
 		db.Close()
 		return nil
 	}
@@ -215,6 +240,7 @@ type Config struct {
 	Twilio struct {
 		AccountSID string `toml:"account-sid"`
 		AuthToken  string `toml:"auth-token"`
+		From       string `toml:"from"`
 	} `toml:"twilio"`
 
 	YoutubeDL struct {

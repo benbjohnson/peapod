@@ -19,7 +19,7 @@ type File struct {
 
 // FileService represents a service for managing file objects.
 type FileService interface {
-	FindFileByID(ctx context.Context, id string) (*File, io.Reader, error)
+	FindFileByID(ctx context.Context, id string) (*File, io.ReadCloser, error)
 	CreateFile(ctx context.Context, f *File, r io.Reader) error
 }
 
