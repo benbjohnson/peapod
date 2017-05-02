@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"io"
 	"io/ioutil"
-	"mime"
 	"net/url"
 	"os"
 	"os/exec"
@@ -14,17 +13,22 @@ import (
 	"github.com/middlemost/peapod"
 )
 
+// Only support a single format for now.
+const (
+	Format      = "m4a"
+	ContentType = "audio/mp4"
+)
+
 // URLTrackGenerator generates audio tracks from a URL.
 type URLTrackGenerator struct {
-	Format string
-	Proxy  string
+	Proxy string
 
 	LogOutput io.Writer
 }
 
 // NewURLTrackGenerator returns a new instance of URLTrackGenerator.
 func NewURLTrackGenerator() *URLTrackGenerator {
-	return &URLTrackGenerator{Format: "m4a"}
+	return &URLTrackGenerator{}
 }
 
 // GenerateTrackFromURL fetches an audio stream from a given URL.
@@ -40,14 +44,17 @@ func (g *URLTrackGenerator) GenerateTrackFromURL(ctx context.Context, u url.URL)
 		return nil, nil, err
 	} else if err := f.Close(); err != nil {
 		return nil, nil, err
+	} else if err := os.Remove(f.Name()); err != nil {
+		return nil, nil, err
 	}
 	path := f.Name()
 
 	// Build argument list.
-	args := []string{"-v", "-f", g.Format, "-o", f.Name(), "--write-info-json"}
+	args := []string{"-v", "-f", Format, "-o", f.Name(), "--write-info-json"}
 	if g.Proxy != "" {
 		args = append(args, "--proxy", g.Proxy)
 	}
+	args = append(args, u.String())
 
 	// Execute command.
 	cmd := exec.Command("youtube-dl", args...)
@@ -69,7 +76,7 @@ func (g *URLTrackGenerator) GenerateTrackFromURL(ctx context.Context, u url.URL)
 	track := &peapod.Track{
 		Title:       info.FullTitle,
 		Duration:    time.Duration(info.Duration) * time.Second,
-		ContentType: mime.TypeByExtension("." + g.Format),
+		ContentType: ContentType,
 		Size:        info.Size,
 	}
 
