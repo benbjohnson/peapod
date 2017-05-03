@@ -46,10 +46,11 @@ func (g *URLTrackGenerator) GenerateTrackFromURL(ctx context.Context, u url.URL)
 	// Build argument list.
 	args := []string{
 		"-v",
-		"-f", "bestaudio",
+		"-f", "worstaudio",
+		"--no-playlist",
 		"--extract-audio",
 		"--audio-format", "mp3",
-		"--audio-quality", "128K",
+		"--audio-quality", "32K",
 		"-o", path + ".%(ext)s",
 		"--write-info-json",
 	}
