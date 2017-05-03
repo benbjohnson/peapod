@@ -214,39 +214,51 @@ func (e *JobExecutor) ExecuteJob(ctx context.Context, job *Job) error {
 func (e *JobExecutor) createTrackFromURL(ctx context.Context, job *Job) error {
 	user := FromContext(ctx)
 
-	// Parse URL.
-	u, err := url.Parse(job.URL)
-	if err != nil {
-		return ErrInvalidURL
+	var title string
+	err := func() error {
+		// Parse URL.
+		u, err := url.Parse(job.URL)
+		if err != nil {
+			return ErrInvalidURL
+		}
+
+		// Generate track & file contents from a URL.
+		track, rc, err := e.URLTrackGenerator.GenerateTrackFromURL(ctx, *u)
+		if err != nil {
+			return err
+		}
+		defer rc.Close()
+		title = track.Title
+
+		// Create a file from the reader.
+		file := &File{Name: e.FileService.GenerateName(".mp3")}
+		if err := e.FileService.CreateFile(ctx, file, rc); err != nil {
+			return err
+		}
+
+		// Attach playlist & file to track.
+		track.PlaylistID = job.PlaylistID
+		track.Filename = file.Name
+
+		// Create new track.
+		if err := e.TrackService.CreateTrack(ctx, track); err != nil {
+			return err
+		}
+		return nil
+	}()
+
+	// Notify user of success/failure.
+	msg := &SMS{To: user.MobileNumber}
+	if err == nil {
+		msg.Body = fmt.Sprintf(`%q has been added to your playlist.`, title)
+	} else {
+		if title != "" {
+			msg.Body = fmt.Sprintf(`Unfortunately there was a problem processing %q.`, title)
+		} else {
+			msg.Body = fmt.Sprintf(`Unfortunately there was a problem processing your request.`)
+		}
 	}
 
-	// Generate track & file contents from a URL.
-	track, rc, err := e.URLTrackGenerator.GenerateTrackFromURL(ctx, *u)
-	if err != nil {
-		return err
-	}
-	defer rc.Close()
-
-	// Create a file from the reader.
-	file := &File{Name: e.FileService.GenerateName(".mp3")}
-	if err := e.FileService.CreateFile(ctx, file, rc); err != nil {
-		return err
-	}
-
-	// Attach playlist & file to track.
-	track.PlaylistID = job.PlaylistID
-	track.Filename = file.Name
-
-	// Create new track.
-	if err := e.TrackService.CreateTrack(ctx, track); err != nil {
-		return err
-	}
-
-	// Notify user of success.
-	msg := &SMS{
-		To:   user.MobileNumber,
-		Body: fmt.Sprintf(`%q has been added to your playlist.`, track.Title),
-	}
 	if err := e.SMSService.SendSMS(ctx, msg); err != nil {
 		return err
 	}
