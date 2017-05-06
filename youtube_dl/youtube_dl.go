@@ -50,7 +50,7 @@ func (g *URLTrackGenerator) GenerateTrackFromURL(ctx context.Context, u url.URL)
 		"--no-playlist",
 		"--extract-audio",
 		"--audio-format", "mp3",
-		"--audio-quality", "64K",
+		"--audio-quality", "128K",
 		"-o", path + ".%(ext)s",
 		"--write-info-json",
 	}
