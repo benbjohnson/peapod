@@ -137,7 +137,5 @@ func (h *twilioHandler) handlePostSMS(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Reply to user that job is being processed.
-	w.Header().Set("Context-Type", "text/plain")
-	w.Write([]byte(`I'll get that processed and let you know when it's ready.`))
+	w.WriteHeader(http.StatusOK)
 }
