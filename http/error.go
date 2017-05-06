@@ -1,7 +1,6 @@
 package http
 
 import (
-	"context"
 	"encoding/json"
 	"fmt"
 	"net/http"
@@ -31,12 +30,12 @@ func ErrorStatusCode(err error) int {
 }
 
 // Error writes an error reponse to the writer.
-func Error(ctx context.Context, w http.ResponseWriter, r *http.Request, err error) {
+func Error(w http.ResponseWriter, r *http.Request, err error) {
 	// Determine status code.
 	code := ErrorStatusCode(err)
 
 	// Log error.
-	if logOutput := FromContext(ctx); logOutput != nil {
+	if logOutput := FromContext(r.Context()); logOutput != nil {
 		fmt.Fprintf(logOutput, "http error: %d %s\n", code, err.Error())
 	}
 

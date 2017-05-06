@@ -13,6 +13,7 @@ const (
 	ErrTrackNotFound         = Error("track not found")
 	ErrTrackPlaylistRequired = Error("track playlist required")
 	ErrTrackFilenameRequired = Error("track filename required")
+	ErrTrackTitleRequired    = Error("track title required")
 )
 
 // Track represents an audio track.

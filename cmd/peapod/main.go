@@ -15,6 +15,7 @@ import (
 
 	"github.com/BurntSushi/toml"
 	"github.com/middlemost/peapod"
+	"github.com/middlemost/peapod/aws"
 	"github.com/middlemost/peapod/bolt"
 	"github.com/middlemost/peapod/http"
 	"github.com/middlemost/peapod/local"
@@ -144,6 +145,21 @@ func (m *Main) Run() error {
 	fileService.Path = filePath
 	fmt.Fprintf(m.Stdout, "file storage: path=%s\n", m.Config.File.Path)
 
+	// Initialize AWS session.
+	var awsSession *aws.Session
+	if m.Config.AWS.AccessKeyID != "" && m.Config.AWS.SecretAccessKey != "" {
+		session, err := aws.NewSession(m.Config.AWS.AccessKeyID, m.Config.AWS.SecretAccessKey, m.Config.AWS.Region)
+		if err != nil {
+			return err
+		}
+		awsSession = session
+	}
+
+	// Initialize TTS service.
+	ttsService := aws.NewTTSService()
+	ttsService.Session = awsSession
+	ttsService.LogOutput = m.Stdout
+
 	// Initialize Twilio service.
 	smsService := twilio.NewSMSService()
 	smsService.AccountSID = m.Config.Twilio.AccountSID
@@ -181,6 +197,7 @@ func (m *Main) Run() error {
 	jobScheduler.JobService = jobService
 	jobScheduler.SMSService = smsService
 	jobScheduler.TrackService = trackService
+	jobScheduler.TTSService = ttsService
 	jobScheduler.UserService = userService
 	jobScheduler.URLTrackGenerator = urlTrackGenerator
 	jobScheduler.LogOutput = m.Stdout
@@ -240,6 +257,12 @@ type Config struct {
 		Host     string `toml:"host"`
 		Autocert bool   `toml:"autocert"`
 	} `toml:"http"`
+
+	AWS struct {
+		AccessKeyID     string `toml:"access-key-id"`
+		SecretAccessKey string `toml:"secret-access-key"`
+		Region          string `toml:"region"`
+	} `toml:"aws"`
 
 	Twilio struct {
 		AccountSID string `toml:"account-sid"`

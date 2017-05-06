@@ -110,6 +110,7 @@ func (s *Server) router() http.Handler {
 		r.Mount("/p", s.playlistHandler()) // alias
 		r.Mount("/playlists", s.playlistHandler())
 		r.Mount("/files", s.fileHandler())
+		r.Mount("/tracks", s.trackHandler())
 		r.Mount("/twilio", s.twilioHandler())
 	})
 
@@ -131,6 +132,15 @@ func (s *Server) playlistHandler() *playlistHandler {
 func (s *Server) fileHandler() *fileHandler {
 	h := newFileHandler()
 	h.fileService = s.FileService
+	return h
+}
+
+func (s *Server) trackHandler() *trackHandler {
+	h := newTrackHandler()
+	h.jobService = s.JobService
+	h.playlistService = s.PlaylistService
+	h.trackService = s.TrackService
+	h.userService = s.UserService
 	return h
 }
 

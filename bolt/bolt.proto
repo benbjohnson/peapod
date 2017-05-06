@@ -8,7 +8,9 @@ message Job {
   string Type = 3;
   string Status = 4;
   int64 PlaylistID = 5;
+  string Title = 10;
   string URL = 6;
+  string Text = 11;
   string Error = 7;
   int64 CreatedAt = 8;
   int64 UpdatedAt = 9;

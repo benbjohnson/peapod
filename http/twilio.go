@@ -58,7 +58,7 @@ func (h *twilioHandler) handlePostSMS(w http.ResponseWriter, r *http.Request) {
 	// Verify incoming message matches account.
 	accountSID := r.PostFormValue("AccountSid")
 	if accountSID != h.accountSID {
-		Error(ctx, w, r, ErrTwilioAccountMismatch)
+		Error(w, r, ErrTwilioAccountMismatch)
 		return
 	}
 
@@ -69,17 +69,17 @@ func (h *twilioHandler) handlePostSMS(w http.ResponseWriter, r *http.Request) {
 	// Parse message as URL & ensure it doesn't point locally.
 	u, err := url.Parse(body)
 	if err != nil {
-		Error(ctx, w, r, ErrInvalidSMSRequestBody)
+		Error(w, r, ErrInvalidSMSRequestBody)
 		return
 	} else if peapod.IsLocal(u.Hostname()) {
-		Error(ctx, w, r, peapod.ErrInvalidURL)
+		Error(w, r, peapod.ErrInvalidURL)
 		return
 	}
 
 	// Lookup user by mobile number.
 	user, err := h.userService.FindUserByMobileNumber(ctx, from)
 	if err != nil {
-		Error(ctx, w, r, err)
+		Error(w, r, err)
 		return
 	}
 
@@ -89,7 +89,7 @@ func (h *twilioHandler) handlePostSMS(w http.ResponseWriter, r *http.Request) {
 		isNewUser = true
 		user = &peapod.User{MobileNumber: from}
 		if err := h.userService.CreateUser(ctx, user); err != nil {
-			Error(ctx, w, r, err)
+			Error(w, r, err)
 			return
 		}
 	}
@@ -100,10 +100,10 @@ func (h *twilioHandler) handlePostSMS(w http.ResponseWriter, r *http.Request) {
 	// Fetch user playlists.
 	playlists, err := h.playlistService.FindPlaylistsByUserID(ctx, user.ID)
 	if err != nil {
-		Error(ctx, w, r, err)
+		Error(w, r, err)
 		return
 	} else if len(playlists) == 0 {
-		Error(ctx, w, r, peapod.ErrPlaylistNotFound)
+		Error(w, r, peapod.ErrPlaylistNotFound)
 		return
 	}
 
@@ -120,7 +120,7 @@ func (h *twilioHandler) handlePostSMS(w http.ResponseWriter, r *http.Request) {
 			Body: fmt.Sprintf("Welcome to Peapod! Your personal podcast feed is:\n\n%s", feedURL.String()),
 		}
 		if err := h.smsService.SendSMS(ctx, sms); err != nil {
-			Error(ctx, w, r, err)
+			Error(w, r, err)
 			return
 		}
 	}
@@ -133,7 +133,7 @@ func (h *twilioHandler) handlePostSMS(w http.ResponseWriter, r *http.Request) {
 		URL:        u.String(),
 	}
 	if err := h.jobService.CreateJob(ctx, &job); err != nil {
-		Error(ctx, w, r, err)
+		Error(w, r, err)
 		return
 	}
 

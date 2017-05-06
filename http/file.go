@@ -39,7 +39,7 @@ func (h *fileHandler) handleGet(w http.ResponseWriter, r *http.Request) {
 	// Fetch file.
 	f, rc, err := h.fileService.FindFileByName(ctx, name)
 	if err != nil {
-		Error(ctx, w, r, err)
+		Error(w, r, err)
 		return
 	}
 	defer rc.Close()
@@ -50,7 +50,7 @@ func (h *fileHandler) handleGet(w http.ResponseWriter, r *http.Request) {
 
 	// Write file contents to response.
 	if _, err := io.Copy(w, rc); err != nil {
-		Error(ctx, w, r, err)
+		Error(w, r, err)
 		return
 	}
 }

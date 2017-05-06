@@ -51,7 +51,7 @@ func (h *playlistHandler) handleGet(w http.ResponseWriter, r *http.Request) {
 	switch {
 	case strings.Contains(r.Header.Get("Accept"), "text/xml"):
 		if err != nil {
-			Error(ctx, w, r, err)
+			Error(w, r, err)
 			return
 		}
 
@@ -104,12 +104,12 @@ func (h *playlistHandler) handleGet(w http.ResponseWriter, r *http.Request) {
 				},
 			},
 		); err != nil {
-			Error(ctx, w, r, err)
+			Error(w, r, err)
 			return
 		}
 
 	default:
-		Error(ctx, w, r, ErrNotAcceptable)
+		Error(w, r, ErrNotAcceptable)
 	}
 }
 

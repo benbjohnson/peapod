@@ -33,7 +33,7 @@ func (h *assetHandler) handleGet(w http.ResponseWriter, r *http.Request) {
 
 	buf, _ := Asset(name)
 	if len(buf) == 0 {
-		Error(r.Context(), w, r, ErrAssetNotFound)
+		Error(w, r, ErrAssetNotFound)
 		return
 	}
 

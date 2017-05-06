@@ -23,12 +23,13 @@ const (
 // Job types.
 const (
 	JobTypeCreateTrackFromURL = "create_track_from_url"
+	JobTypeCreateTrackFromTTS = "create_track_from_tts"
 )
 
 // IsValidJobType returns true if v is a valid type.
 func IsValidJobType(v string) bool {
 	switch v {
-	case JobTypeCreateTrackFromURL:
+	case JobTypeCreateTrackFromURL, JobTypeCreateTrackFromTTS:
 		return true
 	default:
 		return false
@@ -61,7 +62,9 @@ type Job struct {
 	Type       string    `json:"type"`
 	Status     string    `json:"status"`
 	PlaylistID int       `json:"playlist_id,omitempty"`
+	Title      string    `json:"title"`
 	URL        string    `json:"url,omitempty"`
+	Text       string    `json:"text,omitempty"`
 	Error      string    `json:"error,omitempty"`
 	CreatedAt  time.Time `json:"created_at"`
 	UpdatedAt  time.Time `json:"updated_at"`
@@ -87,6 +90,7 @@ type JobScheduler struct {
 	JobService        JobService
 	SMSService        SMSService
 	TrackService      TrackService
+	TTSService        TTSService
 	UserService       UserService
 	URLTrackGenerator URLTrackGenerator
 
@@ -176,6 +180,7 @@ func (s *JobScheduler) executeJob(ctx context.Context, job *Job) {
 		FileService:  s.FileService,
 		SMSService:   s.SMSService,
 		TrackService: s.TrackService,
+		TTSService:   s.TTSService,
 
 		URLTrackGenerator: s.URLTrackGenerator,
 	}
@@ -196,6 +201,7 @@ type JobExecutor struct {
 	FileService  FileService
 	SMSService   SMSService
 	TrackService TrackService
+	TTSService   TTSService
 
 	URLTrackGenerator URLTrackGenerator
 }
@@ -205,6 +211,8 @@ func (e *JobExecutor) ExecuteJob(ctx context.Context, job *Job) error {
 	switch job.Type {
 	case JobTypeCreateTrackFromURL:
 		return e.createTrackFromURL(ctx, job)
+	case JobTypeCreateTrackFromTTS:
+		return e.createTrackFromTTS(ctx, job)
 	default:
 		return ErrInvalidJobType
 	}
@@ -215,7 +223,7 @@ func (e *JobExecutor) createTrackFromURL(ctx context.Context, job *Job) error {
 	user := FromContext(ctx)
 
 	var title string
-	err := func() error {
+	jobErr := func() error {
 		// Parse URL.
 		u, err := url.Parse(job.URL)
 		if err != nil {
@@ -249,7 +257,7 @@ func (e *JobExecutor) createTrackFromURL(ctx context.Context, job *Job) error {
 
 	// Notify user of success/failure.
 	msg := &SMS{To: user.MobileNumber}
-	if err == nil {
+	if jobErr == nil {
 		msg.Body = fmt.Sprintf(`%q has been added to your playlist.`, title)
 	} else {
 		if title != "" {
@@ -263,7 +271,53 @@ func (e *JobExecutor) createTrackFromURL(ctx context.Context, job *Job) error {
 		return err
 	}
 
-	return nil
+	return jobErr
+}
+
+// createTrackFromTTS generates a new track using text-to-speech.
+func (e *JobExecutor) createTrackFromTTS(ctx context.Context, job *Job) error {
+	user := FromContext(ctx)
+
+	jobErr := func() error {
+		// Generate audio file.
+		rc, err := e.TTSService.SynthesizeSpeech(ctx, job.Text)
+		if err != nil {
+			return err
+		}
+		defer rc.Close()
+
+		// Create a file from the reader.
+		file := &File{Name: e.FileService.GenerateName(".mp3")}
+		if err := e.FileService.CreateFile(ctx, file, rc); err != nil {
+			return err
+		}
+
+		// Create new track.
+		if err := e.TrackService.CreateTrack(ctx, &Track{
+			PlaylistID:  job.PlaylistID,
+			Filename:    file.Name,
+			Title:       job.Title,
+			ContentType: "audio/mp3",
+			Size:        int(file.Size),
+		}); err != nil {
+			return err
+		}
+		return nil
+	}()
+
+	// Notify user of success/failure.
+	msg := &SMS{To: user.MobileNumber}
+	if jobErr == nil {
+		msg.Body = fmt.Sprintf(`%q has been added to your playlist.`, job.Title)
+	} else {
+		msg.Body = fmt.Sprintf(`Unfortunately there was a problem processing %q.`, job.Title)
+	}
+
+	if err := e.SMSService.SendSMS(ctx, msg); err != nil {
+		return err
+	}
+
+	return jobErr
 }
 
 func errorString(err error) string {
