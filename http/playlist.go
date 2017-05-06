@@ -137,7 +137,7 @@ type itemRSS struct {
 	Summary     cdata        `xml:"itunes:summary"`
 	Link        string       `xml:"link"`
 	PubDate     string       `xml:"pubDate"`
-	Duration    string       `xml:"itunes:duration"`
+	Duration    string       `xml:"itunes:duration,omitempty"`
 	Enclosure   enclosureRSS `xml:"enclosure"`
 }
 
@@ -153,6 +153,10 @@ type cdata struct {
 
 // formatDuration formats d in HH:MM:SS format.
 func formatDuration(d time.Duration) string {
+	if d == 0 {
+		return ""
+	}
+
 	s := (d / time.Second) % 60
 	m := (d / time.Minute) % 60
 	h := d / time.Hour
